@@ -1,0 +1,17 @@
+{
+  "rawMaterials": {
+    "lead": 100,
+    "acid": 100,
+    "plastic": 100,
+    "copper": 100,
+    "lithium": 100
+  },
+  "batteries": 0,
+  "inverters": 0,
+  "components": {
+    "transformer": 10,
+    "casing": 10
+  },
+  "logs": [],
+  "productionOrders": []
+}
