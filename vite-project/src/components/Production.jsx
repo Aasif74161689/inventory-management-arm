@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import batteryBOM from "../data/batteryBOM";
+import { fetchInventory, updateInventory } from "../firebaseService";
 
-const Production = ({ inventory, setInventory }) => {
+const Production = () => {
+  const [inventory, setInventory] = useState(null);
   const [materialsInput, setMaterialsInput] = useState({
     lead: "",
     acid: "",
@@ -14,6 +16,14 @@ const Production = ({ inventory, setInventory }) => {
 
   // Track actual output inputs per order
   const [actualOutputs, setActualOutputs] = useState({});
+
+  // ✅ Fetch data from Firestore
+  useEffect(() => {
+    (async () => {
+      const data = await fetchInventory();
+      setInventory(data);
+    })();
+  }, []);
 
   const handleChange = (e) => {
     const updatedInput = {
@@ -53,17 +63,17 @@ const Production = ({ inventory, setInventory }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setRequiredOutput("");
     const timestamp = new Date().toLocaleString();
     const updatedLogs = [...inventory.logs];
-    const updatedOrders = [...(inventory.productionOrders || [])];
+    const updatedOrders = [...(inventory?.productionOrders || [])];
 
     let hasEnoughStock = true;
     let insufficientMaterials = [];
     for (let key in materialsInput) {
-      if (inventory.rawMaterials[key] < materialsInput[key]) {
+      if (inventory?.l1_component[key] < materialsInput[key]) {
         hasEnoughStock = false;
         insufficientMaterials.push(key);
       }
@@ -78,18 +88,22 @@ const Production = ({ inventory, setInventory }) => {
         ...inventory,
         logs: updatedLogs,
       });
+      await updateInventory({
+        ...inventory,
+        logs: updatedLogs,
+      });
       alert(
         `Not enough stock for: ${insufficientMaterials
           .map(
             (mat) =>
-              `${mat} (needed: ${materialsInput[mat]}, available: ${inventory.rawMaterials[mat]})`
+              `${mat} (needed: ${materialsInput[mat]}, available: ${inventory?.l1_component[mat]})`
           )
           .join(", ")}`
       );
       return;
     }
 
-    const updatedMaterials = { ...inventory.rawMaterials };
+    const updatedMaterials = { ...inventory?.l1_component };
     for (let key in materialsInput) {
       updatedMaterials[key] -= materialsInput[key];
     }
@@ -109,12 +123,13 @@ const Production = ({ inventory, setInventory }) => {
 
     const updatedInventory = {
       ...inventory,
-      rawMaterials: updatedMaterials,
+      l1_component: updatedMaterials,
       productionOrders: [...updatedOrders, newOrder],
       logs: updatedLogs,
     };
 
     setInventory(updatedInventory);
+    await updateInventory(updatedInventory);
     setMaterialsInput({
       lead: "",
       acid: "",
@@ -132,11 +147,11 @@ const Production = ({ inventory, setInventory }) => {
     });
   };
 
-  const handleCompleteProduction = (orderId) => {
+  const handleCompleteProduction = async (orderId) => {
     const timestamp = new Date().toLocaleString();
     const actual = actualOutputs[orderId] || 0;
 
-    const updatedOrders = inventory.productionOrders.map((order) => {
+    const updatedOrders = inventory?.productionOrders.map((order) => {
       if (order.id === orderId && order.status !== "completed") {
         return {
           ...order,
@@ -147,7 +162,7 @@ const Production = ({ inventory, setInventory }) => {
       return order;
     });
 
-    const completedOrder = inventory.productionOrders.find(
+    const completedOrder = inventory?.productionOrders.find(
       (o) => o.id === orderId
     );
 
@@ -168,13 +183,16 @@ const Production = ({ inventory, setInventory }) => {
 
     const updatedInventory = {
       ...inventory,
-      batteries: inventory.batteries + actual,
+      l2_component: {
+        ...inventory.l2_component,
+        battery: (inventory.l2_component.battery || 0) + actual, // 🔥 update L2 stock
+      },
       productionOrders: updatedOrders,
       logs: [...inventory.logs, ...newLogs],
     };
 
     setInventory(updatedInventory);
-
+    await updateInventory(updatedInventory);
     // Clear input
     setActualOutputs((prev) => {
       const copy = { ...prev };
@@ -198,7 +216,7 @@ const Production = ({ inventory, setInventory }) => {
           {Object.entries(batteryBOM).map(([material, qty]) => (
             <li key={material}>
               <span className="font-medium">{material}</span>: {qty} ( Stock
-              available: {inventory.rawMaterials[material]} )
+              available: {inventory?.l1_component[material]} )
             </li>
           ))}
         </ul>
@@ -264,10 +282,10 @@ const Production = ({ inventory, setInventory }) => {
         <h3 className="text-xl font-semibold mt-10 mb-4">
           🛠️ Active Production Orders
         </h3>
-        {inventory.productionOrders?.filter((o) => o.status === "started")
+        {inventory?.productionOrders?.filter((o) => o.status === "started")
           .length > 0 ? (
           <ul className="space-y-6">
-            {inventory.productionOrders
+            {inventory?.productionOrders
               .filter((order) => order.status === "started")
               .map((order) => (
                 <li

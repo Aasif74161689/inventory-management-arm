@@ -91,7 +91,8 @@ const Inventory = ({ inventory }) => {
                     </td>
                   </tr>
 
-                  {Object.entries(inventory.rawMaterials).map(
+                  {Object.entries(inventory.l1_component
+).map(
                     ([key, value]) => (
                       <tr
                         key={`raw-${key}`}
@@ -124,7 +125,8 @@ const Inventory = ({ inventory }) => {
                     </td>
                   </tr>
 
-                  {Object.entries(inventory.components).map(([key, value]) => (
+                  {Object.entries(inventory.l2_component
+).map(([key, value]) => (
                     <tr key={`comp-${key}`} className="bg-white">
                       <td className="px-4 py-2 capitalize border-b border-gray-200">
                         {key}
@@ -139,7 +141,7 @@ const Inventory = ({ inventory }) => {
                   ))}
 
                   {/* Batteries from inventory.batteries as Component */}
-                  <tr key="comp-batteries" className="bg-white">
+                  {/* <tr key="comp-batteries" className="bg-white">
                     <td className="px-4 py-2 capitalize border-b border-gray-200">
                       Batteries
                     </td>
@@ -149,7 +151,7 @@ const Inventory = ({ inventory }) => {
                     <td className="px-4 py-2 border-b border-gray-200">
                       Component
                     </td>
-                  </tr>
+                  </tr> */}
                 </tbody>
               </table>
             </div>

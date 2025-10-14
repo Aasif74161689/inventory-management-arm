@@ -19,12 +19,14 @@ import UserManagementModal from "./components/UserManagementModal";
 import LoginPage from "./components/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import inventoryJSON from "./data/inventoryData.json";
+// import { fetchInventory, updateInventory, createInventory } from "./firebaseService";
+import { fetchInventory, initInventory, updateInventory } from "./firebaseService";
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation(); // 👈 used to detect current route
   const [user, setUser] = useState(null);
-  const [inventory, setInventory] = useState(inventoryJSON);
+  // const [inventory, setInventory] = useState(inventoryJSON);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [stockModalOpen, setStockModalOpen] = useState(false);
   const [BOMModalOpen, setBOMModalOpen] = useState(false);
@@ -51,7 +53,54 @@ function App() {
   
   const hideNavbar = location.pathname === "/login";
 
+  // firestore
+  const [inventory, setInventory] = useState(null);
+  const [docId, setDocId] = useState("");
+
+  useEffect(() => {
+    const loadInventory = async () => {
+      let data = await fetchInventory();
+      if (!data) {
+        await initInventory({
+          l1_component: { lead: 100, acid: 50, plastic: 75, copper: 200, lithium: 20 },
+          l2_component: { battery: 20, casing: 120, transformer: 20 },
+          logs: [],
+          productionOrders: [],
+          assemblyOrders: [],
+          finalProducts: 0,
+          batteryBOM: { lead: 2, acid: 1, plastic: 1, copper: 1, lithium: 1 }
+        });
+        data = await fetchInventory();
+      }
+      setInventory(data);
+    };
+    loadInventory();
+  }, []);
+
+  const handleUpdateInventory = async (updatedData, logText = null) => {
+    if (logText) updatedData.logs = [...(inventory.logs || []), logText];
+    setInventory({ ...inventory, ...updatedData });
+    await updateInventory({ ...updatedData });
+  };
+
+  if (!inventory) return <p>Loading...</p>;
+  // firrestore end
+
   return (
+    //  <div className="p-4">
+    //   <h1 className="text-2xl font-bold">Inventory</h1>
+    //   <pre>{JSON.stringify(inventory, null, 2)}</pre>
+    //   <button
+    //     onClick={() =>
+    //       handleUpdateInventory({
+    //         l1_component: { ...inventory.l1_component, lead: inventory.l1_component.lead + 10 },
+    //       })
+    //     }
+    //     className="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
+    //   >
+    //     Add 10 Lead
+    //   </button>
+    // </div>
     <div className="min-h-screen bg-gray-50">
       {/* Navbar (hidden on /login) */}
       {!hideNavbar && (
@@ -160,19 +209,19 @@ function App() {
             path="/production"
             element={
               <ProtectedRoute user={user}>
-                <Production inventory={inventory} setInventory={setInventory} />
+                <Production />
               </ProtectedRoute>
             }
           />
 
-          <Route
+          {/* <Route
             path="/assembly"
             element={
               <ProtectedRoute user={user}>
                 <Assembly inventory={inventory} setInventory={setInventory} />
               </ProtectedRoute>
             }
-          />
+          /> */}
         </Routes>
       </main>
 
