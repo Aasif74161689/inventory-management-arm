@@ -57,50 +57,14 @@ function App() {
   const [inventory, setInventory] = useState(null);
   const [docId, setDocId] = useState("");
 
-  useEffect(() => {
-    const loadInventory = async () => {
-      let data = await fetchInventory();
-      if (!data) {
-        await initInventory({
-          l1_component: { lead: 100, acid: 50, plastic: 75, copper: 200, lithium: 20 },
-          l2_component: { battery: 20, casing: 120, transformer: 20 },
-          logs: [],
-          productionOrders: [],
-          assemblyOrders: [],
-          finalProducts: 0,
-          batteryBOM: { lead: 2, acid: 1, plastic: 1, copper: 1, lithium: 1 }
-        });
-        data = await fetchInventory();
-      }
-      setInventory(data);
-    };
-    loadInventory();
-  }, []);
-
   const handleUpdateInventory = async (updatedData, logText = null) => {
     if (logText) updatedData.logs = [...(inventory.logs || []), logText];
     setInventory({ ...inventory, ...updatedData });
     await updateInventory({ ...updatedData });
   };
 
-  if (!inventory) return <p>Loading...</p>;
-  // firrestore end
-
   return (
-    //  <div className="p-4">
-    //   <h1 className="text-2xl font-bold">Inventory</h1>
-    //   <pre>{JSON.stringify(inventory, null, 2)}</pre>
-    //   <button
-    //     onClick={() =>
-    //       handleUpdateInventory({
-    //         l1_component: { ...inventory.l1_component, lead: inventory.l1_component.lead + 10 },
-    //       })
-    //     }
-    //     className="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
-    //   >
-    //     Add 10 Lead
-    //   </button>
-    // </div>
+
     <div className="min-h-screen bg-gray-50">
       {/* Navbar (hidden on /login) */}
       {!hideNavbar && (
@@ -200,11 +164,11 @@ function App() {
             path="/"
             element={
               <ProtectedRoute user={user}>
-                <Inventory inventory={inventory} setInventory={setInventory} />
+                <Inventory />                         
               </ProtectedRoute>
             }
           />
-
+                     {/* inventory={inventory}  */}
           <Route
             path="/production"
             element={

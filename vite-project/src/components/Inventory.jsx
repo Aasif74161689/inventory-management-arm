@@ -1,12 +1,40 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import batteryBOM from "../data/batteryBOM";
 import BulkStockUpdateModal from "./BulkStockUpdateModal";
+import { fetchInventory, initInventory } from "../firebaseService";
 
 const LOW_STOCK_THRESHOLD = 10; // set your low stock limit here
 
-const Inventory = ({ inventory }) => {
+const Inventory = () => {
   const [showMaterials, setShowMaterials] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const [inventory,setInventory] = useState(null)
+
+   useEffect(() => {
+    const loadInventory = async () => {
+      let data = await fetchInventory();
+      if (!data) {
+        await initInventory({
+          l1_component: { lead: 100, acid: 50, plastic: 75, copper: 200, lithium: 20 },
+          l2_component: { battery: 20, casing: 120, transformer: 20 },
+          logs: [],
+          productionOrders: [],
+          assemblyOrders: [],
+          finalProducts: 0,
+          batteryBOM: { lead: 2, acid: 1, plastic: 1, copper: 1, lithium: 1 }
+        });
+        data = await fetchInventory();
+      }
+      setInventory(data);
+    };
+    loadInventory();
+  }, []);
+  
+  
+   
+  // Show loading state while data is fetched
+  if (!inventory) return <p>Loading Inventory...</p>;
 
   return (
     <>
@@ -91,8 +119,7 @@ const Inventory = ({ inventory }) => {
                     </td>
                   </tr>
 
-                  {Object.entries(inventory.l1_component
-).map(
+                  {Object.entries(inventory.l1_component).map(
                     ([key, value]) => (
                       <tr
                         key={`raw-${key}`}
@@ -125,33 +152,21 @@ const Inventory = ({ inventory }) => {
                     </td>
                   </tr>
 
-                  {Object.entries(inventory.l2_component
-).map(([key, value]) => (
-                    <tr key={`comp-${key}`} className="bg-white">
-                      <td className="px-4 py-2 capitalize border-b border-gray-200">
-                        {key}
-                      </td>
-                      <td className="px-4 py-2 border-b border-gray-200">
-                        {value}
-                      </td>
-                      <td className="px-4 py-2 border-b border-gray-200">
-                        Component
-                      </td>
-                    </tr>
-                  ))}
-
-                  {/* Batteries from inventory.batteries as Component */}
-                  {/* <tr key="comp-batteries" className="bg-white">
-                    <td className="px-4 py-2 capitalize border-b border-gray-200">
-                      Batteries
-                    </td>
-                    <td className="px-4 py-2 border-b border-gray-200">
-                      {inventory.batteries}
-                    </td>
-                    <td className="px-4 py-2 border-b border-gray-200">
-                      Component
-                    </td>
-                  </tr> */}
+                  {Object.entries(inventory.l2_component).map(
+                    ([key, value]) => (
+                      <tr key={`comp-${key}`} className="bg-white">
+                        <td className="px-4 py-2 capitalize border-b border-gray-200">
+                          {key}
+                        </td>
+                        <td className="px-4 py-2 border-b border-gray-200">
+                          {value}
+                        </td>
+                        <td className="px-4 py-2 border-b border-gray-200">
+                          Component
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
