@@ -1,36 +1,24 @@
-// src/components/BulkStockUpdateModal.jsx
+// src/materials/BulkStockUpdateModal.jsx
 import React, { useState, useEffect } from "react";
 import { updateInventory } from "../firebaseService"; // ✅ Firebase function
 
-const BulkStockUpdateModal = ({ isOpen, onClose, inventory, setInventory }) => {
+const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   const [stockData, setStockData] = useState([]);
-
+  console.log("🔄 Rendering BulkStockUpdateModal", materials);
   // 🧩 Load structured inventory data
   useEffect(() => {
-    if (isOpen && inventory?.main) {
-      const l1Items = Object.entries(inventory.main.l1_component || {}).map(
-        ([name, qty]) => ({
-          name,
-          qty,
-          category: "l1_component",
-          unit: "kg",
-        })
-      );
+    if (isOpen && materials) {
+      const items = Object.entries(materials || {}).map(([name, qty]) => ({
+        name,
+        qty,
+        unit: "kg",
+      }));
 
-      const l2Items = Object.entries(inventory.main.l2_component || {}).map(
-        ([name, qty]) => ({
-          name,
-          qty,
-          category: "l2_component",
-          unit: "pc",
-        })
-      );
-
-      setStockData([...l1Items, ...l2Items]);
+      setStockData(items);
     } else {
       setStockData([]);
     }
-  }, [isOpen, inventory]);
+  }, [isOpen, materials]);
 
   if (!isOpen) return null;
 
@@ -43,19 +31,19 @@ const BulkStockUpdateModal = ({ isOpen, onClose, inventory, setInventory }) => {
 
   // 💾 Save stock changes
   const handleSave = async () => {
-    if (!inventory?.main) return;
+    if (!materials) return;
 
-    const updatedL1 = { ...inventory.main.l1_component };
-    const updatedL2 = { ...inventory.main.l2_component };
+    const updatedL1 = { ...materials };
     const changes = [];
+    let hasReduction = false; // Track if any material is reduced
 
-    stockData.forEach(({ name, qty, category, unit }) => {
-      if (category === "l1_component" && updatedL1[name] !== qty) {
+    stockData.forEach(({ name, qty, unit }) => {
+      if (updatedL1[name] !== qty) {
         changes.push(`${name}: ${updatedL1[name]} → ${qty} ${unit}`);
+        if (qty < updatedL1[name]) {
+          hasReduction = true;
+        }
         updatedL1[name] = qty;
-      } else if (category === "l2_component" && updatedL2[name] !== qty) {
-        changes.push(`${name}: ${updatedL2[name]} → ${qty} ${unit}`);
-        updatedL2[name] = qty;
       }
     });
 
@@ -63,17 +51,17 @@ const BulkStockUpdateModal = ({ isOpen, onClose, inventory, setInventory }) => {
       const timestamp = new Date().toLocaleString();
       const newLog = {
         timestamp,
-        action: `🔧 Bulk stock update:\n${changes.join("\n")}`,
+        action: hasReduction
+          ? `⚠️ Discrepancy in Bulk stock update:\n${changes.join("\n")}`
+          : `🔧 Bulk stock update:\n${changes.join("\n")}`,
+        ...(hasReduction && { logType: "discrepency" }), // Add logType if any reduction
       };
 
       const updatedData = {
-        ...inventory,
-        main: {
-          ...inventory.main,
-          l1_component: updatedL1,
-          l2_component: updatedL2,
-          logs: [...(inventory.main.logs || []), newLog],
-        },
+        ...materials,
+        l1_component: updatedL1,
+        // l2_component: materials.l2_component,
+        logs: [...(materials.logs || []), newLog],
       };
 
       // ✅ Update UI instantly

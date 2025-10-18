@@ -193,6 +193,7 @@ const Production = () => {
     if (discrepancyMessages.length > 0) {
       newLogs.push({
         timestamp,
+        logType: "discrepency",
         action: `⚠️ Discrepancy in Order #${orderId} - ${discrepancyMessages.join(
           "; "
         )}`,

@@ -68,6 +68,48 @@ const Inventory = () => {
         📦 Inventory Dashboard
       </h2>
 
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-white mb-8">
+        <div className="bg-blue-500 p-4 rounded shadow text-center">
+          <h4 className="text-lg font-semibold">In Production</h4>
+          <p className="text-2xl">
+            {safeNumber(
+              inventory.productionOrders?.filter(
+                (order) => order.status === "started"
+              ).length
+            )}
+          </p>
+        </div>
+
+        <div className="bg-yellow-500 p-4 rounded shadow text-center">
+          <h4 className="text-lg font-semibold">In Assembly</h4>
+          <p className="text-2xl">
+            {safeNumber(
+              inventory.assemblyOrders?.filter(
+                (order) => order.status === "started"
+              ).length
+            )}
+          </p>
+        </div>
+
+        <div className="bg-red-500 p-4 rounded shadow text-center">
+          <h4 className="text-lg font-semibold">Discrepancies</h4>
+          <p className="text-2xl">
+            {safeNumber(
+              inventory.logs?.filter(
+                (log) =>
+                  log.action?.includes("⚠️") &&
+                  log.action?.toLowerCase().includes("discrepancy")
+              ).length
+            )}
+          </p>
+        </div>
+
+        <div className="bg-green-600 p-4 rounded shadow text-center">
+          <h4 className="text-lg font-semibold">Products</h4>
+          <p className="text-2xl">{safeNumber(inventory.finalProducts)}</p>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="flex border-b border-gray-300 mb-6">
         <button
@@ -118,6 +160,7 @@ const Inventory = () => {
           <h3 className="text-xl font-semibold mb-4">
             🔹 L1 | Battery Raw Materials
           </h3>
+          <button onClick={() => setModalOpen(true)}>Update</button>
           <table className="min-w-full border border-gray-300 rounded-md mb-6">
             <thead className="bg-gray-100">
               <tr>
@@ -223,7 +266,13 @@ const Inventory = () => {
                 return (
                   <li
                     key={order.id}
-                    className="bg-white shadow rounded p-4 border border-gray-200"
+                    className={`shadow rounded p-4 border ${
+                      discrepancies.length > 0
+                        ? "bg-red-100 border-red-300"
+                        : order.status === "completed"
+                        ? "bg-green-100 border-green-300"
+                        : "bg-white border-gray-200"
+                    }`}
                   >
                     <p>
                       <strong>Order #{order.id}</strong> — Status:{" "}
@@ -249,7 +298,7 @@ const Inventory = () => {
 
                     {order.status === "completed" &&
                       discrepancies.length > 0 && (
-                        <div className="mt-4 border border-red-500 bg-red-50 text-red-800 p-3 rounded">
+                        <div className="mt-4 border border-red-50 bg-red-50 text-black-800 p-3 rounded">
                           <strong className="block mb-1">
                             ⚠️ Discrepancy Report
                           </strong>
@@ -276,9 +325,7 @@ const Inventory = () => {
 
           <ul className="space-y-2">
             {(inventory.logs || []).map((log, idx) => {
-              const isDiscrepancy =
-                log.action?.includes("⚠️") &&
-                log.action?.toLowerCase().includes("discrepancy");
+              const isDiscrepancy = log.logType === "discrepency";
 
               return (
                 <li
@@ -316,7 +363,7 @@ const Inventory = () => {
       <BulkStockUpdateModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        inventory={inventory}
+        materials={inventory.l1_component}
         setInventory={setInventory}
       />
     </div>
