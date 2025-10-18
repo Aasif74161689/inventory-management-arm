@@ -1,54 +1,57 @@
 import React, { useState, useEffect } from "react";
 import batteryBOM from "../data/batteryBOM";
 import BulkStockUpdateModal from "./BulkStockUpdateModal";
-import { fetchInventory } from "../firebaseService";
+import { fetchInventory, initInventory } from "../firebaseService";
 
-const LOW_STOCK_THRESHOLD = 10; // low stock warning limit
+const LOW_STOCK_THRESHOLD = 10;
 
 const Inventory = () => {
-  const [showMaterials, setShowMaterials] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
   const [inventory, setInventory] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("l1"); // l1 | l2 | orders | logs
 
-  // Helper to safely render numbers
   const safeNumber = (val) => (isNaN(val) || val == null ? 0 : val);
 
-  // 🔹 Fetch Inventory Data from Firebase
   useEffect(() => {
     const loadInventory = async () => {
-      try {
-        const data = await fetchInventory();
-        setInventory(data || {});
-      } catch (error) {
-        console.error("Error fetching inventory:", error);
-        setInventory({});
-      } finally {
-        setLoading(false);
+      let data = await fetchInventory();
+      if (!data) {
+        await initInventory({
+          l1_component: {
+            lead: 100,
+            acid: 50,
+            plastic: 75,
+            copper: 200,
+            lithium: 20,
+          },
+          l2_component: { battery: 20, casing: 120, transformer: 20 },
+          logs: [],
+          productionOrders: [],
+          assemblyOrders: [],
+          finalProducts: 0,
+          batteryBOM: { lead: 2, acid: 1, plastic: 1, copper: 1, lithium: 1 },
+        });
+        data = await fetchInventory();
       }
+      setInventory(data);
+      setLoading(false);
     };
     loadInventory();
   }, []);
 
-  // 🔸 Loading State
   if (loading)
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
-        <div className="text-center">
-          <p className="text-lg animate-pulse">Loading Inventory...</p>
-        </div>
+        <p className="animate-pulse">Loading Inventory...</p>
       </div>
     );
 
-  // 🔸 Empty or Missing Data
   if (!inventory)
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center text-gray-600">
+      <div className="flex items-center justify-center h-screen text-gray-600">
+        <div className="text-center">
           <p className="text-2xl font-semibold mb-2">⚠️ No inventory data</p>
-          <p className="text-gray-500">
-            Please wait for inventory to load or refresh the page.
-          </p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -60,155 +63,121 @@ const Inventory = () => {
     );
 
   return (
-    <>
-      <div className="max-w-4xl mx-auto p-4 space-y-8">
-        <h2 className="text-3xl font-bold text-center mb-6">
-          📦 Inventory Overview
-        </h2>
+    <div className="max-w-6xl mx-auto p-4">
+      <h2 className="text-3xl font-bold text-center mb-6">
+        📦 Inventory Dashboard
+      </h2>
 
-        {/* ✅ Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-white mb-8">
-          <div className="bg-blue-500 p-4 rounded shadow text-center">
-            <h4 className="text-lg font-semibold">In Production</h4>
-            <p className="text-2xl">
-              {safeNumber(
-                inventory.productionOrders?.filter(
-                  (order) => order.status === "started"
-                ).length
+      {/* Tabs */}
+      <div className="flex border-b border-gray-300 mb-6">
+        <button
+          onClick={() => setActiveTab("l1")}
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "l1"
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "text-gray-600"
+          }`}
+        >
+          L1 Production / Inventory
+        </button>
+        <button
+          onClick={() => setActiveTab("l2")}
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "l2"
+              ? "border-b-2 border-green-600 text-green-600"
+              : "text-gray-600"
+          }`}
+        >
+          L2 Assembly / Inventory
+        </button>
+        <button
+          onClick={() => setActiveTab("orders")}
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "orders"
+              ? "border-b-2 border-yellow-600 text-yellow-600"
+              : "text-gray-600"
+          }`}
+        >
+          Production Orders
+        </button>
+        <button
+          onClick={() => setActiveTab("logs")}
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "logs"
+              ? "border-b-2 border-gray-600 text-gray-600"
+              : "text-gray-600"
+          }`}
+        >
+          Logs
+        </button>
+      </div>
+
+      {/* Tab Panels */}
+      {activeTab === "l1" && (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">
+            🔹 L1 | Battery Raw Materials
+          </h3>
+          <table className="min-w-full border border-gray-300 rounded-md mb-6">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 border-b">Material</th>
+                <th className="px-4 py-2 border-b">Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(inventory.l1_component || {}).map(
+                ([key, val]) => (
+                  <tr
+                    key={key}
+                    className={
+                      safeNumber(val) <= LOW_STOCK_THRESHOLD
+                        ? "bg-red-100 text-red-800 font-semibold"
+                        : "bg-white"
+                    }
+                  >
+                    <td className="px-4 py-2 border-b capitalize">{key}</td>
+                    <td className="px-4 py-2 border-b">{safeNumber(val)}</td>
+                  </tr>
+                )
               )}
-            </p>
-          </div>
-
-          <div className="bg-yellow-500 p-4 rounded shadow text-center">
-            <h4 className="text-lg font-semibold">In Assembly</h4>
-            <p className="text-2xl">
-              {safeNumber(
-                inventory.assemblyOrders?.filter(
-                  (order) => order.status === "started"
-                ).length
-              )}
-            </p>
-          </div>
-
-          <div className="bg-red-500 p-4 rounded shadow text-center">
-            <h4 className="text-lg font-semibold">Discrepancies</h4>
-            <p className="text-2xl">
-              {safeNumber(
-                inventory.logs?.filter(
-                  (log) =>
-                    log.action?.includes("⚠️") &&
-                    log.action?.toLowerCase().includes("discrepancy")
-                ).length
-              )}
-            </p>
-          </div>
-
-          <div className="bg-green-600 p-4 rounded shadow text-center">
-            <h4 className="text-lg font-semibold">Products</h4>
-            <p className="text-2xl">{safeNumber(inventory.finalProducts)}</p>
-          </div>
+            </tbody>
+          </table>
         </div>
+      )}
 
-        {/* ✅ Raw Materials and Components Table */}
-        <section>
-          <div
-            className="flex items-center justify-between cursor-pointer mb-3 border-b border-gray-300 pb-1"
-            onClick={() => setShowMaterials((prev) => !prev)}
-          >
-            <h3 className="text-xl font-semibold">
-              Raw Materials | L1 Production and Components | L2 Assembly
-            </h3>
-            <span className="text-gray-500 text-lg">
-              {showMaterials ? "▼" : "►"}
-            </span>
-          </div>
-
-          {showMaterials && (
-            <div className="overflow-x-auto transition-all duration-300 ease-in-out">
-              <table className="min-w-full border border-gray-300 rounded-md">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="text-left px-4 py-2 border-b border-gray-300">
-                      Item
-                    </th>
-                    <th className="text-left px-4 py-2 border-b border-gray-300">
-                      Quantity
-                    </th>
-                    <th className="text-left px-4 py-2 border-b border-gray-300">
-                      Category
-                    </th>
+      {activeTab === "l2" && (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">
+            🔸 L2 | Assembly Components
+          </h3>
+          <table className="min-w-full border border-gray-300 rounded-md mb-6">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 border-b">Component</th>
+                <th className="px-4 py-2 border-b">Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(inventory.l2_component || {}).map(
+                ([key, val]) => (
+                  <tr key={key} className="bg-white">
+                    <td className="px-4 py-2 border-b capitalize">{key}</td>
+                    <td className="px-4 py-2 border-b">{safeNumber(val)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {/* 🔹 L1 Subheader */}
-                  <tr className="bg-blue-50">
-                    <td
-                      colSpan="3"
-                      className="px-4 py-2 font-semibold text-blue-800"
-                    >
-                      🔹 L1 | Battery : Raw Materials
-                    </td>
-                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-                  {Object.entries(inventory.l1_component || {}).map(
-                    ([key, value]) => (
-                      <tr
-                        key={`raw-${key}`}
-                        className={
-                          safeNumber(value) <= LOW_STOCK_THRESHOLD
-                            ? "bg-red-100 text-red-800 font-semibold"
-                            : "bg-white"
-                        }
-                      >
-                        <td className="px-4 py-2 capitalize border-b border-gray-200">
-                          {key}
-                        </td>
-                        <td className="px-4 py-2 border-b border-gray-200">
-                          {safeNumber(value)}
-                        </td>
-                        <td className="px-4 py-2 border-b border-gray-200">
-                          Raw Material
-                        </td>
-                      </tr>
-                    )
-                  )}
-
-                  {/* 🔸 L2 Subheader */}
-                  <tr className="bg-green-50">
-                    <td
-                      colSpan="3"
-                      className="px-4 py-2 font-semibold text-green-800"
-                    >
-                      🔸 L2 | Inverter: Components
-                    </td>
-                  </tr>
-
-                  {Object.entries(inventory.l2_component || {}).map(
-                    ([key, value]) => (
-                      <tr key={`comp-${key}`} className="bg-white">
-                        <td className="px-4 py-2 capitalize border-b border-gray-200">
-                          {key}
-                        </td>
-                        <td className="px-4 py-2 border-b border-gray-200">
-                          {safeNumber(value)}
-                        </td>
-                        <td className="px-4 py-2 border-b border-gray-200">
-                          Component
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* ✅ Production Orders */}
+      {activeTab === "orders" && (
         <section>
           <h3 className="text-xl font-semibold mb-3 border-b border-gray-300 pb-1">
             🛠️ Production Orders
           </h3>
+
           {inventory.productionOrders?.length > 0 ? (
             <ul className="space-y-6">
               {inventory.productionOrders.map((order) => {
@@ -216,6 +185,7 @@ const Inventory = () => {
                 const discrepancies = [];
 
                 if (order.status === "completed") {
+                  // Calculate expected material usage
                   Object.entries(order.materialsUsed || {}).forEach(
                     ([mat, qty]) => {
                       expectedMaterials[mat] =
@@ -224,6 +194,7 @@ const Inventory = () => {
                     }
                   );
 
+                  // Check for discrepancies
                   Object.entries(order.materialsUsed || {}).forEach(
                     ([mat, usedQty]) => {
                       const expected = expectedMaterials[mat] || 0;
@@ -260,7 +231,9 @@ const Inventory = () => {
                       Output: {safeNumber(order.predictedOutput)} battery
                       {safeNumber(order.predictedOutput) !== 1 ? "ies" : ""}
                     </p>
+
                     <p>Started At: {order.timestamp}</p>
+
                     <div className="mt-2">
                       <p className="font-semibold">Materials Used:</p>
                       <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
@@ -295,53 +268,58 @@ const Inventory = () => {
             <p className="text-gray-500 italic">No production orders yet.</p>
           )}
         </section>
+      )}
 
-        {/* ✅ Activity Logs */}
-        <h3 className="text-xl font-semibold mt-10 mb-4">📜 Logs</h3>
-        <ul className="space-y-2">
-          {(inventory.logs || []).map((log, idx) => {
-            const isDiscrepancy =
-              log.action?.includes("⚠️") &&
-              log.action?.toLowerCase().includes("discrepancy");
+      {activeTab === "logs" && (
+        <div>
+          <h3 className="text-xl font-semibold mt-10 mb-4">📜 Logs</h3>
 
-            return (
-              <li
-                key={idx}
-                className={`border p-4 rounded-md ${
-                  isDiscrepancy
-                    ? "border-red-500 bg-red-50 text-red-800"
-                    : "border-gray-300 bg-white"
-                }`}
-              >
-                <div className="text-sm text-gray-500">{log.timestamp}</div>
-                <div className="mt-1 text-base">
-                  {isDiscrepancy ? (
-                    <>
-                      <strong className="block mb-1">
-                        ⚠️ Discrepancy in Production Order
-                      </strong>
-                      <div className="whitespace-pre-wrap">
-                        {log.action.replace("⚠️ ", "")}
-                      </div>
-                    </>
-                  ) : (
-                    <span>{log.action}</span>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+          <ul className="space-y-2">
+            {(inventory.logs || []).map((log, idx) => {
+              const isDiscrepancy =
+                log.action?.includes("⚠️") &&
+                log.action?.toLowerCase().includes("discrepancy");
 
-      {/* ✅ Bulk Stock Update Modal */}
+              return (
+                <li
+                  key={idx}
+                  className={`border p-4 rounded-md ${
+                    isDiscrepancy
+                      ? "border-red-500 bg-red-50 text-red-800"
+                      : "border-gray-300 bg-white"
+                  }`}
+                >
+                  <div className="text-sm text-gray-500">{log.timestamp}</div>
+
+                  <div className="mt-1 text-base">
+                    {isDiscrepancy ? (
+                      <>
+                        <strong className="block mb-1">
+                          ⚠️ Discrepancy in Production Order
+                        </strong>
+                        <div className="whitespace-pre-wrap">
+                          {log.action.replace("⚠️ ", "")}
+                        </div>
+                      </>
+                    ) : (
+                      <span>{log.action}</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Bulk Stock Update Modal */}
       <BulkStockUpdateModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         inventory={inventory}
         setInventory={setInventory}
       />
-    </>
+    </div>
   );
 };
 
