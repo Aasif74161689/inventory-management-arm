@@ -1,4 +1,4 @@
-// src/components/BatteryBOMUpdateModal.js
+// src/components/BatteryBOMUpdateModal.jsx
 import React, { useState, useEffect } from "react";
 import batteryBOMData from "../data/batteryBOM";
 
@@ -11,7 +11,9 @@ const BatteryBOMUpdateModal = ({
   const [bom, setBOM] = useState({});
 
   useEffect(() => {
-    setBOM({ ...batteryBOMData });
+    if (isOpen) {
+      setBOM({ ...batteryBOMData });
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -22,15 +24,17 @@ const BatteryBOMUpdateModal = ({
   };
 
   const handleSave = () => {
-    // Update batteryBOM data (in-memory)
+    // ✅ Update batteryBOM data (in-memory)
     Object.keys(bom).forEach((key) => {
       batteryBOMData[key] = bom[key];
     });
 
-    // Optional: add log to inventory
+    // ✅ Safe check for logs array
+    const existingLogs = inventory?.logs || [];
+
     const timestamp = new Date().toLocaleString();
     const updatedLogs = [
-      ...inventory.logs,
+      ...existingLogs,
       {
         timestamp,
         action: `🔧 Battery BOM updated: ${Object.entries(bom)
@@ -38,7 +42,12 @@ const BatteryBOMUpdateModal = ({
           .join(", ")}`,
       },
     ];
-    setInventory({ ...inventory, logs: updatedLogs });
+
+    // ✅ Safely update inventory
+    setInventory({
+      ...inventory,
+      logs: updatedLogs,
+    });
 
     onClose();
   };

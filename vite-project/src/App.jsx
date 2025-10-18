@@ -20,7 +20,11 @@ import LoginPage from "./components/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import inventoryJSON from "./data/inventoryData.json";
 // import { fetchInventory, updateInventory, createInventory } from "./firebaseService";
-import { fetchInventory, initInventory, updateInventory } from "./firebaseService";
+import {
+  fetchInventory,
+  initInventory,
+  updateInventory,
+} from "./firebaseService";
 
 function App() {
   const navigate = useNavigate();
@@ -50,7 +54,6 @@ function App() {
 
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "";
 
-  
   const hideNavbar = location.pathname === "/login";
 
   // firestore
@@ -64,7 +67,6 @@ function App() {
   };
 
   return (
-
     <div className="min-h-screen bg-gray-50">
       {/* Navbar (hidden on /login) */}
       {!hideNavbar && (
@@ -164,11 +166,11 @@ function App() {
             path="/"
             element={
               <ProtectedRoute user={user}>
-                <Inventory />                         
+                <Inventory />
               </ProtectedRoute>
             }
           />
-                     {/* inventory={inventory}  */}
+          {/* inventory={inventory}  */}
           <Route
             path="/production"
             element={
@@ -178,14 +180,14 @@ function App() {
             }
           />
 
-          {/* <Route
+          <Route
             path="/assembly"
             element={
               <ProtectedRoute user={user}>
-                <Assembly inventory={inventory} setInventory={setInventory} />
+                <Assembly />
               </ProtectedRoute>
             }
-          /> */}
+          />
         </Routes>
       </main>
 

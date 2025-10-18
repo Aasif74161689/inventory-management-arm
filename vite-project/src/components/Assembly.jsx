@@ -1,7 +1,12 @@
+// src/components/Assembly.jsx
 import React, { useState, useEffect } from "react";
 import assemblyBOM from "../data/assemblyBOM";
+import { fetchInventory, updateInventory } from "../firebaseService";
 
-const Assembly = ({ inventory, setInventory }) => {
+const Assembly = () => {
+  const [inventory, setInventory] = useState(null);
+  const [loading, setLoading] = useState(true);
+
   const [materialsInput, setMaterialsInput] = useState({
     battery: "",
     transformer: "",
@@ -10,6 +15,16 @@ const Assembly = ({ inventory, setInventory }) => {
   const [predictedOutput, setPredictedOutput] = useState(0);
   const [actualOutputs, setActualOutputs] = useState({});
 
+  // ✅ Fetch inventory on mount
+  useEffect(() => {
+    (async () => {
+      const data = await fetchInventory();
+      setInventory(data);
+      setLoading(false);
+    })();
+  }, []);
+
+  // ✅ Handle material input changes
   const handleChange = (e) => {
     const updatedInput = {
       ...materialsInput,
@@ -18,89 +33,95 @@ const Assembly = ({ inventory, setInventory }) => {
     setMaterialsInput(updatedInput);
   };
 
+  // ✅ Calculate predicted output
   useEffect(() => {
+    if (!inventory) return;
     const times = Object.entries(assemblyBOM).map(([material, required]) => {
       const entered = materialsInput[material] || 0;
       return Math.floor(entered / required);
     });
     setPredictedOutput(Math.min(...times));
-  }, [materialsInput]);
+  }, [materialsInput, inventory]);
 
-  const handleSubmit = (e) => {
+  // ✅ Start assembly order
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!inventory) return;
 
     const timestamp = new Date().toLocaleString();
-    const updatedLogs = [...inventory.logs];
+    const updatedLogs = [...(inventory.logs || [])];
     const updatedOrders = [...(inventory.assemblyOrders || [])];
 
-    // Current stock
+    // 🔹 Read all stock from l2_component only
     const stockCheck = {
-      battery: inventory.batteries,
-      transformer: inventory.components.transformer,
-      casing: inventory.components.casing,
+      battery: inventory.l2_component?.battery ?? 0,
+      transformer: inventory.l2_component?.transformer ?? 0,
+      casing: inventory.l2_component?.casing ?? 0,
     };
 
-    let hasEnoughStock = true;
-    for (let key in materialsInput) {
-      if ((stockCheck[key] || 0) < materialsInput[key]) {
-        hasEnoughStock = false;
-        break;
-      }
-    }
+    // 🔹 Check for insufficient stock
+    const insufficient = Object.keys(materialsInput).filter(
+      (mat) => (stockCheck[mat] || 0) < materialsInput[mat]
+    );
 
-    if (!hasEnoughStock) {
+    if (insufficient.length > 0) {
       updatedLogs.push({
         timestamp,
-        action: "❌ Not enough inventory to start assembly order",
+        action: `❌ Not enough inventory to start assembly`,
       });
-      setInventory({
-        ...inventory,
-        logs: updatedLogs,
-      });
+
+      const updatedInventory = { ...inventory, logs: updatedLogs };
+      setInventory(updatedInventory);
+      await updateInventory(updatedInventory);
+
+      alert(
+        `Not enough stock for: ${insufficient
+          .map(
+            (mat) =>
+              `${mat} (needed: ${materialsInput[mat]}, available: ${stockCheck[mat]})`
+          )
+          .join(", ")}`
+      );
       return;
     }
 
-    // Deduct materials from inventory
-    const updatedBatteries =
-      inventory.batteries - (materialsInput.battery || 0);
-    const updatedComponents = {
-      ...inventory.components,
-      transformer:
-        inventory.components.transformer - (materialsInput.transformer || 0),
-      casing: inventory.components.casing - (materialsInput.casing || 0),
-    };
-
-    const newOrder = {
-      id: updatedOrders.length + 1,
-      materialsUsed: { ...materialsInput },
-      status: "started",
-      predictedOutput,
-      timestamp,
-    };
-
-    updatedLogs.push({
-      timestamp,
-      action: `🔧 Assembly started (Order #${newOrder.id}) - Predicted Output: ${predictedOutput}`,
-    });
-
+    // 🔹 Deduct used materials from l2_component
     const updatedInventory = {
       ...inventory,
-      batteries: updatedBatteries,
-      components: updatedComponents,
-      assemblyOrders: [...updatedOrders, newOrder],
-      logs: updatedLogs,
+      l2_component: {
+        ...inventory.l2_component,
+        battery: stockCheck.battery - (materialsInput.battery || 0),
+        transformer: stockCheck.transformer - (materialsInput.transformer || 0),
+        casing: stockCheck.casing - (materialsInput.casing || 0),
+      },
+      assemblyOrders: [
+        ...updatedOrders,
+        {
+          id: updatedOrders.length + 1,
+          materialsUsed: { ...materialsInput },
+          predictedOutput,
+          status: "started",
+          timestamp,
+        },
+      ],
+      logs: [
+        ...updatedLogs,
+        {
+          timestamp,
+          action: `🔧 Assembly started (Order #${
+            updatedOrders.length + 1
+          }) - Predicted Output: ${predictedOutput}`,
+        },
+      ],
     };
 
     setInventory(updatedInventory);
-
-    setMaterialsInput({
-      battery: "",
-      transformer: "",
-      casing: "",
-    });
+    await updateInventory(updatedInventory);
+    setMaterialsInput({ battery: "", transformer: "", casing: "" });
     setPredictedOutput(0);
   };
 
+  // ✅ Actual output input handler
   const handleActualOutputChange = (orderId, value) => {
     setActualOutputs({
       ...actualOutputs,
@@ -108,30 +129,25 @@ const Assembly = ({ inventory, setInventory }) => {
     });
   };
 
-  const handleCompleteAssembly = (orderId) => {
-    const timestamp = new Date().toLocaleString();
-    const actual = actualOutputs[orderId] || 0;
+  // ✅ Complete assembly order → add to finalProducts
+  const handleCompleteAssembly = async (orderId) => {
+    if (!inventory) return;
 
-    const updatedOrders = inventory.assemblyOrders.map((order) => {
-      if (order.id === orderId && order.status !== "completed") {
-        return {
-          ...order,
-          status: "completed",
-          actualOutput: actual,
-        };
-      }
-      return order;
-    });
+    const actual = actualOutputs[orderId] || 0;
+    const timestamp = new Date().toLocaleString();
+
+    const updatedOrders = inventory.assemblyOrders.map((order) =>
+      order.id === orderId && order.status !== "completed"
+        ? { ...order, status: "completed", actualOutput: actual }
+        : order
+    );
 
     const completedOrder = inventory.assemblyOrders.find(
       (o) => o.id === orderId
     );
 
     const newLogs = [
-      {
-        timestamp,
-        action: `✅ Assembly completed for Order #${orderId}`,
-      },
+      { timestamp, action: `✅ Assembly completed for Order #${orderId}` },
     ];
 
     if (actual !== completedOrder.predictedOutput) {
@@ -143,12 +159,13 @@ const Assembly = ({ inventory, setInventory }) => {
 
     const updatedInventory = {
       ...inventory,
-      inverters: inventory.inverters + actual,
+      finalProducts: (inventory.finalProducts || 0) + actual,
       assemblyOrders: updatedOrders,
-      logs: [...inventory.logs, ...newLogs],
+      logs: [...(inventory.logs || []), ...newLogs],
     };
 
     setInventory(updatedInventory);
+    await updateInventory(updatedInventory);
 
     setActualOutputs((prev) => {
       const copy = { ...prev };
@@ -156,6 +173,9 @@ const Assembly = ({ inventory, setInventory }) => {
       return copy;
     });
   };
+
+  if (loading) return <p>Loading Inventory...</p>;
+  if (!inventory) return <p>No inventory data found.</p>;
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8">
@@ -169,7 +189,8 @@ const Assembly = ({ inventory, setInventory }) => {
         <ul className="list-disc list-inside space-y-1 text-gray-700 capitalize">
           {Object.entries(assemblyBOM).map(([material, qty]) => (
             <li key={material}>
-              <span className="font-medium">{material}</span>: {qty}
+              <span className="font-medium">{material}</span>: {qty} (Stock:{" "}
+              {inventory.l2_component?.[material] ?? 0})
             </li>
           ))}
         </ul>
@@ -236,6 +257,7 @@ const Assembly = ({ inventory, setInventory }) => {
                     <span className="font-medium">{order.predictedOutput}</span>
                   </p>
                   <p>Started At: {order.timestamp}</p>
+
                   <div className="mt-2">
                     <p className="font-semibold mb-1">Materials:</p>
                     <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
@@ -246,6 +268,7 @@ const Assembly = ({ inventory, setInventory }) => {
                       ))}
                     </ul>
                   </div>
+
                   <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4">
                     <label
                       htmlFor={`actual-${order.id}`}
@@ -281,6 +304,16 @@ const Assembly = ({ inventory, setInventory }) => {
           <p className="text-gray-500 italic">No active assembly orders.</p>
         )}
       </section>
+
+      {/* Final Products */}
+      {/* <section>
+        <h3 className="text-xl font-semibold mt-10 mb-2">
+          📦 Total Final Products:
+        </h3>
+        <p className="text-2xl font-bold text-green-600">
+          {inventory.finalProducts || 0}
+        </p>
+      </section> */}
     </div>
   );
 };
