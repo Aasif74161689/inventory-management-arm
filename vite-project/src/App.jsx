@@ -10,32 +10,17 @@ import {
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 
-import Inventory from "./components/Inventory";
-import Production from "./components/Production";
-import Assembly from "./components/Assembly";
-import BulkStockUpdateModal from "./components/BulkStockUpdateModal";
-import BatteryBOMUpdateModal from "./components/BatteryBOMUpdateModal";
-import UserManagementModal from "./components/UserManagementModal";
-import LoginPage from "./components/LoginPage";
+import Inventory from "./pages/Inventory";
+import Production from "./pages/Production";
+import Assembly from "./pages/Assembly";
+import History from "./pages/History";
+import LoginPage from "./pages/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import inventoryJSON from "./data/inventoryData.json";
-// import { fetchInventory, updateInventory, createInventory } from "./firebaseService";
-import {
-  fetchInventory,
-  initInventory,
-  updateInventory,
-} from "./firebaseService";
 
 function App() {
   const navigate = useNavigate();
   const location = useLocation(); // 👈 used to detect current route
   const [user, setUser] = useState(null);
-  // const [inventory, setInventory] = useState(inventoryJSON);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [stockModalOpen, setStockModalOpen] = useState(false);
-  const [BOMModalOpen, setBOMModalOpen] = useState(false);
-  const [userManagementOpen, setUserManagementOpen] = useState(false);
-  const [users, setUsers] = useState([]);
 
   // 🔐 Watch Firebase authentication state
   useEffect(() => {
@@ -58,57 +43,88 @@ function App() {
 
   // firestore
   const [inventory, setInventory] = useState(null);
-  const [docId, setDocId] = useState("");
-
-  const handleUpdateInventory = async (updatedData, logText = null) => {
-    if (logText) updatedData.logs = [...(inventory.logs || []), logText];
-    setInventory({ ...inventory, ...updatedData });
-    await updateInventory({ ...updatedData });
-  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar (hidden on /login) */}
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar (visible on all sizes): icon-only on small, expanded on md+ */}
       {!hideNavbar && (
-        <nav className="sticky top-0 z-50 bg-white shadow p-4">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            {/* Navigation Links */}
-            <div className="flex space-x-6 text-sm sm:text-base font-medium text-gray-700">
-              <NavLink to="/" label="Inventory" />
-              <NavLink to="/production" label="Production" />
-              <NavLink to="/assembly" label="Assembly" />
+        <aside className="w-16 md:w-64 bg-white shadow h-screen sticky top-0">
+          <div className="h-full flex flex-col justify-between py-4">
+            <div>
+              <div className="px-3 mb-6 hidden md:block">
+                <h2 className="text-lg font-bold">Inventory App</h2>
+              </div>
+
+              <nav className="flex flex-col items-center md:items-start space-y-2 px-2 md:px-4">
+                <SidebarLink to="/" label="Inventory" icon={<HomeIcon />} />
+                <SidebarLink
+                  to="/production"
+                  label="Production"
+                  icon={<FactoryIcon />}
+                />
+                <SidebarLink
+                  to="/assembly"
+                  label="Assembly"
+                  icon={<AssemblyIcon />}
+                />
+                <SidebarLink
+                  to="/history"
+                  label="History"
+                  icon={<HistoryIcon />}
+                />
+              </nav>
             </div>
 
-            {/* User Menu */}
-            <div className="flex items-center space-x-4 relative">
+            <div className="px-2 md:px-4">
               {user ? (
-                <>
-                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
+                <div className="flex flex-col items-center md:items-start space-y-1">
+                  <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
                     {initials}
                   </div>
-
+                  <div className="hidden md:block">
+                    <div className="text-sm font-medium">
+                      {user.displayName || user.email}
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="text-sm text-red-600 hover:underline"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                  {/* small logout icon for mobile */}
                   <button
                     onClick={handleLogout}
-                    className="text-sm text-red-600 hover:underline"
+                    className="md:hidden p-1 text-red-600"
+                    aria-label="Logout"
                   >
-                    Logout
+                    <LogoutIcon />
                   </button>
-                </>
+                </div>
               ) : (
-                <button
-                  onClick={() => navigate("/login")}
-                  className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                >
-                  Login
-                </button>
+                <div className="flex flex-col items-center md:items-start">
+                  <button
+                    onClick={() => navigate("/login")}
+                    className="hidden md:block w-full bg-blue-600 text-white px-3 py-2 rounded"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => navigate("/login")}
+                    className="md:hidden p-1 text-blue-600"
+                    aria-label="Login"
+                  >
+                    <LoginIcon />
+                  </button>
+                </div>
               )}
             </div>
           </div>
-        </nav>
+        </aside>
       )}
 
-      {/* Main Routes */}
-      <main className="max-w-6xl mx-auto p-4">
+      {/* Main content area with 5% left/right padding */}
+      <main className="flex-1 max-w-6xl mx-auto px-[5%] py-4">
         <Routes>
           {/* Login Route */}
           <Route
@@ -143,23 +159,17 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute user={user}>
+                <History />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
-
-      {/* Modals */}
-      <BatteryBOMUpdateModal
-        isOpen={BOMModalOpen}
-        onClose={() => setBOMModalOpen(false)}
-        inventory={inventory}
-        setInventory={setInventory}
-      />
-
-      <UserManagementModal
-        isOpen={userManagementOpen}
-        onClose={() => setUserManagementOpen(false)}
-        users={users}
-        setUsers={setUsers}
-      />
     </div>
   );
 }
@@ -181,6 +191,215 @@ function NavLink({ to, label }) {
       {label}
     </Link>
   );
+}
+
+function SidebarLink({ to, label, icon }) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
+  return (
+    <Link
+      to={to}
+      className={`flex items-center w-full md:px-3 md:py-2 rounded-md transition-colors duration-200 ${
+        isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-100"
+      }`}
+    >
+      <div className="w-8 h-8 flex items-center justify-center">{icon}</div>
+      <span className="hidden md:inline ml-3">{label}</span>
+    </Link>
+  );
+}
+
+// Simple SVG icons (kept inline to avoid new dependencies)
+function HomeIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3 10.5L12 4l9 6.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5 10.5v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function FactoryIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3 21h18"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 21V10l4-3v14"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 21V13l-4-2v10"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function AssemblyIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M19 12c0-3.866-3.134-7-7-7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M21 12a9 9 0 1 1-3-6.7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 7v6l4 2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M16 17l5-5-5-5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 12H9"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LoginIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M8 7l-5 5 5 5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 12h11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 19v-2a4 4 0 0 0-4-4H11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function getPageTitle(pathname) {
+  switch (pathname) {
+    case "/":
+      return "Inventory";
+    case "/production":
+      return "Production";
+    case "/assembly":
+      return "Assembly";
+    case "/history":
+      return "History";
+    default:
+      return "";
+  }
 }
 
 export default App;

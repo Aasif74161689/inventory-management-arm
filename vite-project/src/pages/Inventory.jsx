@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import batteryBOM from "../data/batteryBOM";
-import BulkStockUpdateModal from "./BulkStockUpdateModal";
+import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
 import { fetchInventory, initInventory } from "../firebaseService";
 
 const LOW_STOCK_THRESHOLD = 10;
