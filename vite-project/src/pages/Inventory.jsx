@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // add this at the top
 import batteryBOM from "../data/batteryBOM";
 import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
 import { fetchInventory, initInventory } from "../firebaseService";
@@ -6,6 +7,8 @@ import { fetchInventory, initInventory } from "../firebaseService";
 const LOW_STOCK_THRESHOLD = 10;
 
 const Inventory = () => {
+  const navigate = useNavigate(); // inside your component
+
   const [inventory, setInventory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -132,7 +135,7 @@ const Inventory = () => {
         >
           L2 Assembly / Inventory
         </button>
-        <button
+        {/* <button
           onClick={() => setActiveTab("orders")}
           className={`px-4 py-2 font-semibold ${
             activeTab === "orders"
@@ -151,6 +154,9 @@ const Inventory = () => {
           }`}
         >
           Logs
+        </button> */}
+        <button className="px-4 py-2 font-semibold text-gray-600 hover:text-blue-600">
+          setting
         </button>
       </div>
 
@@ -221,7 +227,7 @@ const Inventory = () => {
         </div>
       )}
 
-      {activeTab === "orders" && (
+      {/* {activeTab === "orders" && (
         <section>
           <h3 className="text-xl font-semibold mb-3 border-b border-gray-300 pb-1">
             🛠️ Production Orders
@@ -366,7 +372,7 @@ const Inventory = () => {
             })}
           </ul>
         </div>
-      )}
+      )} */}
 
       {/* Bulk Stock Update Modal */}
       <BulkStockUpdateModal
