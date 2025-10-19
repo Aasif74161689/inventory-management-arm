@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import batteryBOM from "../data/batteryBOM";
 import { fetchInventory, updateInventory } from "../firebaseService";
+import Loader from "../components/Loader";
 
 const Production = () => {
   const [inventory, setInventory] = useState(null);
@@ -220,7 +221,7 @@ const Production = () => {
     });
   };
 
-  if (!inventory) return <p>Loading Inventory...</p>;
+  if (!inventory) return <Loader />;
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8">

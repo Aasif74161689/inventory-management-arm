@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import batteryBOM from "../data/batteryBOM";
 import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
 import { fetchInventory, initInventory } from "../firebaseService";
+import Loader from "../components/Loader";
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -40,12 +41,7 @@ const Inventory = () => {
     loadInventory();
   }, []);
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
-        <p className="animate-pulse">Loading Inventory...</p>
-      </div>
-    );
+  if (loading) return <Loader />;
 
   if (!inventory)
     return (

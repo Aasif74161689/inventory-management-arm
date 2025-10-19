@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import assemblyBOM from "../data/assemblyBOM";
 import { fetchInventory, updateInventory } from "../firebaseService";
+import Loader from "../components/Loader";
 
 const Assembly = () => {
   const [inventory, setInventory] = useState(null);
@@ -174,7 +175,7 @@ const Assembly = () => {
     });
   };
 
-  if (loading) return <p>Loading Inventory...</p>;
+  if (loading) return <Loader />;
   if (!inventory) return <p>No inventory data found.</p>;
 
   return (
