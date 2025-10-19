@@ -87,51 +87,6 @@ function App() {
                     {initials}
                   </div>
 
-                  <div className="relative">
-                    <button
-                      onClick={() => setDropdownOpen((prev) => !prev)}
-                      className="p-1 hover:bg-gray-200 rounded"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 text-gray-700"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                        />
-                      </svg>
-                    </button>
-
-                    {dropdownOpen && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white border rounded shadow-lg z-50">
-                        <button
-                          onClick={() => {
-                            setStockModalOpen(true);
-                            setDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100"
-                        >
-                          Update Stock
-                        </button>
-                        <button
-                          onClick={() => {
-                            setBOMModalOpen(true);
-                            setDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100"
-                        >
-                          Update Battery BOM
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
                   <button
                     onClick={handleLogout}
                     className="text-sm text-red-600 hover:underline"
@@ -192,13 +147,6 @@ function App() {
       </main>
 
       {/* Modals */}
-      <BulkStockUpdateModal
-        isOpen={stockModalOpen}
-        onClose={() => setStockModalOpen(false)}
-        inventory={inventory}
-        setInventory={setInventory}
-      />
-
       <BatteryBOMUpdateModal
         isOpen={BOMModalOpen}
         onClose={() => setBOMModalOpen(false)}
