@@ -107,31 +107,50 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
         {showConfirm ? (
           <div>
             <h4 className="text-lg font-semibold mb-3">Confirm Changes</h4>
+
             {previewChanges.length > 0 ? (
-              <ul className="space-y-2 mb-4">
-                {previewChanges.map(({ name, oldQty, newQty, unit, diff }) => (
-                  <li key={name} className="flex justify-between items-center">
-                    <span className="capitalize">{name}:</span>
-                    <span>
-                      <span>
-                        {oldQty} {unit}
-                      </span>
-                      {diff > 0 ? (
-                        <span className="ml-2 text-green-600 font-bold">
-                          +{diff} ({oldQty} + {diff} = {newQty} {unit})
-                        </span>
-                      ) : (
-                        <span className="ml-2 text-red-600 font-bold">
-                          {diff} ({oldQty} {diff} = {newQty} {unit})
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-300 rounded-lg">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="text-left px-4 py-2 border-b">Item</th>
+                      <th className="text-left px-4 py-2 border-b">Old</th>
+                      <th className="text-left px-4 py-2 border-b">Change</th>
+                      <th className="text-left px-4 py-2 border-b">New</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewChanges.map(
+                      ({ name, oldQty, newQty, unit, diff }) => (
+                        <tr key={name} className="border-b hover:bg-gray-50">
+                          <td className="capitalize px-4 py-2">{name}</td>
+                          <td className="px-4 py-2">
+                            {oldQty} {unit}
+                          </td>
+                          <td
+                            className={`px-4 py-2 font-semibold ${
+                              diff > 0
+                                ? "text-green-600"
+                                : diff < 0
+                                ? "text-red-600"
+                                : ""
+                            }`}
+                          >
+                            {diff > 0 ? `+${diff}` : diff}
+                          </td>
+                          <td className="px-4 py-2">
+                            {newQty} {unit}
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <p className="text-gray-500">No changes detected.</p>
             )}
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowConfirm(false)}
@@ -163,8 +182,8 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                     <input
                       type="number"
                       min={-item.available}
-                      placeholder={item.available}
-                      value={item.qty}
+                      placeholder="Update"
+                      value={item.qty === 0 ? "" : item.qty}
                       onChange={(e) => handleChange(index, e.target.value)}
                       className="border px-2 py-1 rounded w-24"
                     />

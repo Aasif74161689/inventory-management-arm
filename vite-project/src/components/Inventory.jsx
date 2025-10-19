@@ -157,10 +157,16 @@ const Inventory = () => {
       {/* Tab Panels */}
       {activeTab === "l1" && (
         <div>
-          <h3 className="text-xl font-semibold mb-4">
+          <h3 className="text-xl font-semibold mb-4 flex justify-between">
             🔹 L1 | Battery Raw Materials
+            <button
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+              onClick={() => setModalOpen(true)}
+            >
+              Update
+            </button>
           </h3>
-          <button onClick={() => setModalOpen(true)}>Update</button>
+
           <table className="min-w-full border border-gray-300 rounded-md mb-6">
             <thead className="bg-gray-100">
               <tr>
