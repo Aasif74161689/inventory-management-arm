@@ -5,6 +5,7 @@ import { updateInventory } from "../firebaseService";
 const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   const [stockData, setStockData] = useState([]);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [remarks, setRemarks] = useState("");
 
   useEffect(() => {
     if (isOpen && materials) {
@@ -16,9 +17,11 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
       }));
       setStockData(items);
       setShowConfirm(false);
+      setRemarks("");
     } else {
       setStockData([]);
       setShowConfirm(false);
+      setRemarks("");
     }
   }, [isOpen, materials]);
 
@@ -45,9 +48,17 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
     stockData.forEach(({ name, qty, available, unit }) => {
       const newQty = available + qty;
       if (available !== newQty) {
-        changes.push(`${name}: ${available} → ${newQty} ${unit}`);
+        const diff = newQty - available;
+        const diffWithSign = diff > 0 ? `+${diff}` : `${diff}`;
         if (newQty < available) {
+          changes.push(
+            `⚠️ ${name}: ${available} → ${newQty} ${unit} {${diffWithSign}}`
+          );
           hasReduction = true;
+        } else {
+          changes.push(
+            `${name}: ${available} → ${newQty} ${unit} {${diffWithSign}}`
+          );
         }
         updatedL1[name] = newQty;
       }
@@ -61,6 +72,7 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
           ? `⚠️ Discrepancy in Bulk stock update:\n${changes.join("\n")}`
           : `🔧 Bulk stock update:\n${changes.join("\n")}`,
         ...(hasReduction && { logType: "discrepency" }),
+        ...(remarks && { remarks }),
       };
 
       const updatedData = {
@@ -150,6 +162,24 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
             ) : (
               <p className="text-gray-500">No changes detected.</p>
             )}
+
+            {/* Remarks input */}
+            <div className="mt-4">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="remarks"
+              >
+                Remarks (optional):
+              </label>
+              <textarea
+                id="remarks"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                className="border rounded px-2 py-1 w-full resize-none"
+                rows={2}
+                placeholder="Add remarks for this update..."
+              />
+            </div>
 
             <div className="flex justify-end space-x-3 mt-6">
               <button

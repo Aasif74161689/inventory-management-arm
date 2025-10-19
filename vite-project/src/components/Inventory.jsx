@@ -348,14 +348,17 @@ const Inventory = () => {
                     {isDiscrepancy ? (
                       <>
                         <strong className="block mb-1">
-                          ⚠️ Discrepancy in Production Order
+                          ⚠️ Discrepancy Alert
                         </strong>
                         <div className="whitespace-pre-wrap">
                           {log.action.replace("⚠️ ", "")}
                         </div>
                       </>
                     ) : (
-                      <span>{log.action}</span>
+                      <>
+                        <span>{log.action}</span>
+                        <div>{log?.remarks}</div>
+                      </>
                     )}
                   </div>
                 </li>
