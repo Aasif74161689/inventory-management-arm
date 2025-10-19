@@ -45,86 +45,112 @@ function App() {
   const [inventory, setInventory] = useState(null);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar (visible on all sizes): icon-only on small, expanded on md+ */}
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      {/* Sidebar on md+ screens */}
       {!hideNavbar && (
-        <aside className="w-16 md:w-64 bg-white shadow h-screen sticky top-0">
-          <div className="h-full flex flex-col justify-between py-4">
-            <div>
-              <div className="px-3 mb-6 hidden md:block">
-                <h2 className="text-lg font-bold">Inventory App</h2>
+        <>
+          <aside className="hidden md:block w-64 bg-white shadow h-screen sticky top-0">
+            <div className="h-full flex flex-col justify-between py-4">
+              <div>
+                <div className="px-3 mb-6">
+                  <h2 className="text-lg font-bold">Inventory App</h2>
+                </div>
+
+                <nav className="flex flex-col items-start space-y-2 px-4">
+                  <SidebarLink to="/" label="Inventory" icon={<HomeIcon />} />
+                  <SidebarLink
+                    to="/production"
+                    label="Production"
+                    icon={<FactoryIcon />}
+                  />
+                  <SidebarLink
+                    to="/assembly"
+                    label="Assembly"
+                    icon={<AssemblyIcon />}
+                  />
+                  <SidebarLink
+                    to="/history"
+                    label="History"
+                    icon={<HistoryIcon />}
+                  />
+                </nav>
               </div>
 
-              <nav className="flex flex-col items-center md:items-start space-y-2 px-2 md:px-4">
-                <SidebarLink to="/" label="Inventory" icon={<HomeIcon />} />
-                <SidebarLink
-                  to="/production"
-                  label="Production"
-                  icon={<FactoryIcon />}
-                />
-                <SidebarLink
-                  to="/assembly"
-                  label="Assembly"
-                  icon={<AssemblyIcon />}
-                />
-                <SidebarLink
-                  to="/history"
-                  label="History"
-                  icon={<HistoryIcon />}
-                />
-              </nav>
-            </div>
-
-            <div className="px-2 md:px-4">
-              {user ? (
-                <div className="flex flex-col items-center md:items-start space-y-1">
-                  <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
-                    {initials}
-                  </div>
-                  <div className="hidden md:block">
-                    <div className="text-sm font-medium">
-                      {user.displayName || user.email}
+              <div className="px-4">
+                {user ? (
+                  <div className="flex items-start space-x-3">
+                    <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
+                      {initials}
                     </div>
-                    <button
-                      onClick={handleLogout}
-                      className="text-sm text-red-600 hover:underline"
-                    >
-                      Logout
-                    </button>
+                    <div>
+                      <div className="text-sm font-medium">
+                        {user.displayName || user.email}
+                      </div>
+                      <button
+                        onClick={handleLogout}
+                        className="text-sm text-red-600 hover:underline"
+                      >
+                        Logout
+                      </button>
+                    </div>
                   </div>
-                  {/* small logout icon for mobile */}
-                  <button
-                    onClick={handleLogout}
-                    className="md:hidden p-1 text-red-600"
-                    aria-label="Logout"
-                  >
-                    <LogoutIcon />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center md:items-start">
+                ) : (
                   <button
                     onClick={() => navigate("/login")}
-                    className="hidden md:block w-full bg-blue-600 text-white px-3 py-2 rounded"
+                    className="w-full bg-blue-600 text-white px-3 py-2 rounded"
                   >
                     Login
                   </button>
-                  <button
-                    onClick={() => navigate("/login")}
-                    className="md:hidden p-1 text-blue-600"
-                    aria-label="Login"
-                  >
-                    <LoginIcon />
-                  </button>
-                </div>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          {/* Bottom navigation bar on mobile */}
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t">
+            <div className="flex items-center justify-around py-2">
+              <BottomNavLink to="/" icon={<HomeIcon />} label="Inventory" />
+              <BottomNavLink
+                to="/production"
+                icon={<FactoryIcon />}
+                label="Production"
+              />
+              <BottomNavLink
+                to="/assembly"
+                icon={<AssemblyIcon />}
+                label="Assembly"
+              />
+              <BottomNavLink
+                to="/history"
+                icon={<HistoryIcon />}
+                label="History"
+              />
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="p-2 flex flex-col items-center"
+                  aria-label="Logout"
+                >
+                  <LogoutIcon />
+                  <span className="text-xs mt-1">Logout</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate("/login")}
+                  className="p-2 flex flex-col items-center text-blue-600"
+                  aria-label="Login"
+                >
+                  <LoginIcon />
+                  <span className="text-xs mt-1">Login</span>
+                </button>
               )}
             </div>
-          </div>
-        </aside>
+          </nav>
+        </>
       )}
 
-      {/* Main content area with 5% left/right padding */}
-      <main className="flex-1 max-w-6xl mx-auto px-[5%] py-4">
+      {/* Main content area with 5% left/right padding and bottom padding for mobile nav */}
+      <main className="flex-1 max-w-6xl mx-auto px-[5%] py-4 pb-16 md:pb-4">
         <Routes>
           {/* Login Route */}
           <Route
@@ -200,12 +226,29 @@ function SidebarLink({ to, label, icon }) {
   return (
     <Link
       to={to}
-      className={`flex items-center w-full md:px-3 md:py-2 rounded-md transition-colors duration-200 ${
+      className={`flex items-center w-full px-3 py-2 rounded-md transition-colors duration-200 ${
         isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-100"
       }`}
     >
-      <div className="w-8 h-8 flex items-center justify-center">{icon}</div>
-      <span className="hidden md:inline ml-3">{label}</span>
+      <div className="w-6 h-6 flex items-center justify-center">{icon}</div>
+      <span className="ml-3">{label}</span>
+    </Link>
+  );
+}
+
+function BottomNavLink({ to, label, icon }) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
+  return (
+    <Link
+      to={to}
+      className={`p-2 flex flex-col items-center transition-colors duration-200 ${
+        isActive ? "text-blue-600" : "text-gray-600 hover:text-blue-500"
+      }`}
+    >
+      <div className="w-5 h-5 flex items-center justify-center">{icon}</div>
+      <span className="text-xs mt-1">{label}</span>
     </Link>
   );
 }
