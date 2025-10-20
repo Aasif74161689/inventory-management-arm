@@ -279,17 +279,31 @@ const Production = () => {
         Battery Production
       </h2>
 
-      <div className="border border-gray-300 rounded-md p-4 mb-8 bg-gray-50">
-        <h3 className="text-xl font-semibold mb-3">🧾 BOM for 1 Battery</h3>
-        <ul className="list-disc list-inside space-y-1 text-gray-700 capitalize">
-          {batteryBOM.map((bom) => (
-            <li key={bom.productId}>
-              <span className="font-medium">{bom.name}</span>: {bom.qty} (
-              Stock: {l1Map[bom.productId]?.quantity || 0}{" "}
-              {l1Map[bom.productId]?.unit || ""})
-            </li>
+      <div className="border border-gray-300 rounded-md p-6 mb-8 bg-gray-50 w-full">
+        <h3 className="text-xl font-semibold mb-6 text-center">
+          🧾 BOM for 1 Battery
+        </h3>
+
+        <div className="flex gap-12">
+          {/* Split array into two halves */}
+          {[
+            batteryBOM.slice(0, Math.ceil(batteryBOM.length / 2)),
+            batteryBOM.slice(Math.ceil(batteryBOM.length / 2)),
+          ].map((half, idx) => (
+            <ul
+              key={idx}
+              className="list-none space-y-2 text-gray-700 capitalize flex-1"
+            >
+              {half.map((bom) => (
+                <li key={bom.productId}>
+                  <span className="font-medium">{bom.name}</span>: {bom.qty} (
+                  Stock: {l1Map[bom.productId]?.quantity || 0}{" "}
+                  {l1Map[bom.productId]?.unit || ""})
+                </li>
+              ))}
+            </ul>
           ))}
-        </ul>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -299,7 +313,7 @@ const Production = () => {
           </label>
           <input
             id="requiredOutput"
-            type="number"
+            type="text"
             min="1"
             value={requiredOutput}
             onChange={handleRequiredOutputChange}
@@ -450,7 +464,7 @@ const Production = () => {
                               {order.status === "started" && (
                                 <>
                                   <input
-                                    type="number"
+                                    type="text"
                                     min="0"
                                     step="any"
                                     value={actualOutputs[order.id] ?? ""}
@@ -501,11 +515,11 @@ const Production = () => {
                                   )}
                                 </ul>
 
-                                {discrepancy && (
+                                {/* {discrepancy && (
                                   <p className="mt-2 text-red-700 bg-red-100 p-2 rounded text-sm">
                                     ⚠️ {discrepancy.action}
                                   </p>
-                                )}
+                                )} */}
                               </div>
                             </td>
                           </tr>

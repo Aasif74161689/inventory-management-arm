@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; // add this at the top
 import batteryBOM from "../data/batteryBOM";
 import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
-import { fetchInventory, initInventory } from "../firebaseService";
+import {
+  fetchInventory,
+  initInventory,
+  updateInventory,
+} from "../firebaseService";
 import Loader from "../components/Loader";
 
 const LOW_STOCK_THRESHOLD = 10;
@@ -352,8 +356,15 @@ const Inventory = () => {
           L2 Assembly / Inventory
         </button>
 
-        <button className="px-4 py-2 font-semibold text-gray-600 hover:text-blue-600">
-          setting
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`px-4 py-2 font-semibold ${
+            activeTab === "settings"
+              ? "border-b-2 border-purple-600 text-purple-600"
+              : "text-gray-600"
+          }`}
+        >
+          Settings
         </button>
       </div>
 
@@ -451,6 +462,205 @@ const Inventory = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Settings panel */}
+      {activeTab === "settings" && (
+        <div>
+          <h3 className="text-xl font-semibold mb-4">⚙️ Settings</h3>
+          <div className="grid grid-cols-1 gap-6">
+            <div>
+              <h4 className="text-lg font-semibold mb-3">
+                L1 | Raw Material Settings
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {(inventory.l1_component || []).map((item) => (
+                  <div
+                    key={item.productId}
+                    className={`border rounded p-4 shadow ${
+                      safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
+                        ? "bg-red-50"
+                        : "bg-white"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm text-gray-500">
+                          {item.productId}
+                        </div>
+                        <div className="text-lg font-semibold">
+                          {item.productName}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {item.category}
+                        </div>
+                        <div className="mt-2">
+                          <span className="font-medium">Qty:</span>{" "}
+                          {safeNumber(item.quantity)} {item.unit}
+                        </div>
+                        <div>
+                          <span className="font-medium">Min Threshold:</span>{" "}
+                          {safeNumber(item.minThreshold)} {item.unit}
+                        </div>
+                      </div>
+                      <div className="flex flex-col space-y-2">
+                        <button
+                          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+                          onClick={async () => {
+                            const input = window.prompt(
+                              `Enter new BOM qty for ${item.productName} (per unit):`,
+                              item.bomQty ?? ""
+                            );
+                            if (input == null) return;
+                            const val = parseFloat(input);
+                            if (isNaN(val)) return alert("Invalid number");
+                            setInventory((prev) => {
+                              const copy = { ...prev };
+                              copy.l1_component = (copy.l1_component || []).map(
+                                (it) =>
+                                  it.productId === item.productId
+                                    ? { ...it, bomQty: val }
+                                    : it
+                              );
+                              updateInventory(copy).catch((e) =>
+                                console.error(e)
+                              );
+                              return copy;
+                            });
+                          }}
+                        >
+                          Update BOM
+                        </button>
+
+                        <button
+                          className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
+                          onClick={async () => {
+                            const input = window.prompt(
+                              `Enter new min threshold for ${item.productName}:`,
+                              item.minThreshold ?? ""
+                            );
+                            if (input == null) return;
+                            const val = parseFloat(input);
+                            if (isNaN(val)) return alert("Invalid number");
+                            setInventory((prev) => {
+                              const copy = { ...prev };
+                              copy.l1_component = (copy.l1_component || []).map(
+                                (it) =>
+                                  it.productId === item.productId
+                                    ? { ...it, minThreshold: val }
+                                    : it
+                              );
+                              updateInventory(copy).catch((e) =>
+                                console.error(e)
+                              );
+                              return copy;
+                            });
+                          }}
+                        >
+                          Update Threshold
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-lg font-semibold mb-3">
+                L2 | Assembly Settings
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {(inventory.l2_component || []).map((item) => (
+                  <div
+                    key={item.productId}
+                    className={`border rounded p-4 shadow ${
+                      safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
+                        ? "bg-red-50"
+                        : "bg-white"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm text-gray-500">
+                          {item.productId}
+                        </div>
+                        <div className="text-lg font-semibold">
+                          {item.productName}
+                        </div>
+                        <div className="mt-2">
+                          <span className="font-medium">Qty:</span>{" "}
+                          {safeNumber(item.quantity)} {item.unit}
+                        </div>
+                        <div>
+                          <span className="font-medium">Min Threshold:</span>{" "}
+                          {safeNumber(item.minThreshold)} {item.unit}
+                        </div>
+                      </div>
+                      <div className="flex flex-col space-y-2">
+                        <button
+                          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+                          onClick={async () => {
+                            const input = window.prompt(
+                              `Enter new BOM qty for ${item.productName} (per unit):`,
+                              item.bomQty ?? ""
+                            );
+                            if (input == null) return;
+                            const val = parseFloat(input);
+                            if (isNaN(val)) return alert("Invalid number");
+                            setInventory((prev) => {
+                              const copy = { ...prev };
+                              copy.l2_component = (copy.l2_component || []).map(
+                                (it) =>
+                                  it.productId === item.productId
+                                    ? { ...it, bomQty: val }
+                                    : it
+                              );
+                              updateInventory(copy).catch((e) =>
+                                console.error(e)
+                              );
+                              return copy;
+                            });
+                          }}
+                        >
+                          Update BOM
+                        </button>
+
+                        <button
+                          className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
+                          onClick={async () => {
+                            const input = window.prompt(
+                              `Enter new min threshold for ${item.productName}:`,
+                              item.minThreshold ?? ""
+                            );
+                            if (input == null) return;
+                            const val = parseFloat(input);
+                            if (isNaN(val)) return alert("Invalid number");
+                            setInventory((prev) => {
+                              const copy = { ...prev };
+                              copy.l2_component = (copy.l2_component || []).map(
+                                (it) =>
+                                  it.productId === item.productId
+                                    ? { ...it, minThreshold: val }
+                                    : it
+                              );
+                              updateInventory(copy).catch((e) =>
+                                console.error(e)
+                              );
+                              return copy;
+                            });
+                          }}
+                        >
+                          Update Threshold
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

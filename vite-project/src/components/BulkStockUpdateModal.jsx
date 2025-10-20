@@ -251,25 +251,37 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
         ) : (
           <>
             {stockData.length > 0 ? (
-              <div className="space-y-3">
-                {stockData.map((item, index) => (
-                  <div
-                    key={item.productId || item.productName}
-                    className="flex justify-between items-center"
-                  >
-                    <span className="capitalize">
-                      {item.productName} ({item.unit}) — Available:{" "}
-                      {item.available}
-                    </span>
-                    <input
-                      type="number"
-                      min={-item.available}
-                      step="any"
-                      placeholder={String(item.available)}
-                      value={item.qty === 0 ? "" : item.qty}
-                      onChange={(e) => handleChange(index, e.target.value)}
-                      className="border px-2 py-1 rounded w-28 text-right"
-                    />
+              <div className="flex gap-12">
+                {/* Split stockData into two halves */}
+                {[
+                  stockData.slice(0, Math.ceil(stockData.length / 2)),
+                  stockData.slice(Math.ceil(stockData.length / 2)),
+                ].map((half, idx) => (
+                  <div key={idx} className="flex-1 space-y-3">
+                    {half.map((item, index) => (
+                      <div
+                        key={item.productId || item.productName}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="capitalize">
+                          {item.productName} ({item.unit})
+                        </span>
+                        <input
+                          type="number"
+                          min={-item.available}
+                          step="any"
+                          placeholder={String(item.available)}
+                          value={item.qty === 0 ? "" : item.qty}
+                          onChange={(e) =>
+                            handleChange(
+                              stockData.indexOf(item), // keep correct index reference
+                              e.target.value
+                            )
+                          }
+                          className="border px-2 py-1 rounded w-28 text-right"
+                        />
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
