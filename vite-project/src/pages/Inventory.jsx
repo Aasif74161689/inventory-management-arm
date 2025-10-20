@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // add this at the top
 import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
 import {
   fetchInventory,
@@ -8,7 +7,6 @@ import {
 } from "../firebaseService";
 import Loader from "../components/Loader";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -311,14 +309,25 @@ const Inventory = () => {
       </div>
     );
 
+  // Non-invasive computed metric: Total L1 produced
+  // Sum actualOutput for completed orders, fallback to predictedOutput when actual is missing
+  const totalL1Produced = (inventory.productionOrders || [])
+    .filter((o) => o != null)
+    .reduce((sum, o) => {
+      // only count completed orders by default; if you prefer to count all, remove the filter
+      if (o.status && o.status !== "completed") return sum;
+      const val = Number(o.actualOutput ?? o.predictedOutput ?? 0);
+      return sum + (isNaN(val) ? 0 : val);
+    }, 0);
+
   return (
     <div className="max-w-6xl mx-auto p-4">
       <h2 className="text-3xl font-bold text-center mb-6">
         📦 Inventory Dashboard
       </h2>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-white mb-8">
-        <div className="bg-blue-500 p-4 rounded shadow text-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-white mb-8">
+        <div className="bg-blue-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
           <h4 className="text-lg font-semibold">In Production</h4>
           <p className="text-2xl">
             {safeNumber(
@@ -329,7 +338,7 @@ const Inventory = () => {
           </p>
         </div>
 
-        <div className="bg-yellow-500 p-4 rounded shadow text-center">
+        <div className="bg-yellow-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
           <h4 className="text-lg font-semibold">In Assembly</h4>
           <p className="text-2xl">
             {safeNumber(
@@ -340,7 +349,7 @@ const Inventory = () => {
           </p>
         </div>
 
-        <div className="bg-red-500 p-4 rounded shadow text-center">
+        <div className="bg-red-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
           <h4 className="text-lg font-semibold">Discrepancies</h4>
           <p className="text-2xl">
             {safeNumber(
@@ -353,8 +362,19 @@ const Inventory = () => {
           </p>
         </div>
 
-        <div className="bg-green-600 p-4 rounded shadow text-center">
-          <h4 className="text-lg font-semibold">Products</h4>
+        {/* Plates Produced (computed) */}
+        <div className="bg-indigo-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
+          <h4 className="text-lg font-semibold">Plates Produced</h4>
+          <p className="text-2xl">{totalL1Produced}</p>
+        </div>
+
+        <div className="bg-teal-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
+          <h4 className="text-lg font-semibold">Assembled</h4>
+          <p className="text-2xl">0</p>
+        </div>
+
+        <div className="bg-green-600 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
+          <h4 className="text-lg font-semibold">Ready to Ship</h4>
           <p className="text-2xl">{safeNumber(inventory.finalProducts)}</p>
         </div>
       </div>

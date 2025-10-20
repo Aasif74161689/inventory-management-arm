@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { updateInventory } from "../firebaseService";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 
 const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   const [stockData, setStockData] = useState([]);

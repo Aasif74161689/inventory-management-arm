@@ -283,13 +283,11 @@ const Production = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-8">
-      <h2 className="text-3xl font-bold text-center mb-6">
-        Battery Production
-      </h2>
+      <h2 className="text-3xl font-bold text-center mb-6">Plate Production</h2>
 
       <div className="border border-gray-300 rounded-md p-6 mb-8 bg-gray-50 w-full">
         <h3 className="text-xl font-semibold mb-6 text-center">
-          🧾 BOM for 1 Battery
+          🧾 BOM for 1 Plate
         </h3>
 
         <div className="flex gap-12">
