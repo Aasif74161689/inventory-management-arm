@@ -22,14 +22,234 @@ const Inventory = () => {
       let data = await fetchInventory();
       if (!data) {
         await initInventory({
-          l1_component: {
-            lead: 100,
-            acid: 50,
-            plastic: 75,
-            copper: 200,
-            lithium: 20,
-          },
-          l2_component: { battery: 20, casing: 120, transformer: 20 },
+          l1_component: [
+            {
+              productId: "PD-001",
+              productName: "Positive Jali",
+              category: "Lead Alloy",
+              unit: "KG",
+              quantity: 250,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-002",
+              productName: "Negative Jali",
+              category: "Lead Alloy",
+              unit: "KG",
+              quantity: 150,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-003",
+              productName: "Part Die",
+              category: "Lead Alloy",
+              unit: "KG",
+              quantity: 500,
+              minThreshold: 5,
+            },
+            {
+              productId: "PD-004",
+              productName: "Positive Filling",
+              category: "Oxide",
+              unit: "KG",
+              quantity: 300,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-005",
+              productName: "Negative Pasting",
+              category: "Oxide",
+              unit: "KG",
+              quantity: 320,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-006",
+              productName: "Positive Filling",
+              category: "Red Oxide",
+              unit: "KG",
+              quantity: 100,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-007",
+              productName: "Berium",
+              category: "Chemical",
+              unit: "KG",
+              quantity: 50,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-008",
+              productName: "Carbon",
+              category: "Chemical",
+              unit: "KG",
+              quantity: 40,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-009",
+              productName: "Lignin",
+              category: "Chemical",
+              unit: "KG",
+              quantity: 60,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-010",
+              productName: "Fibre",
+              category: "Chemical",
+              unit: "KG",
+              quantity: 80,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-011",
+              productName: "DM Water",
+              category: "Chemical",
+              unit: "LTR",
+              quantity: 200,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-012",
+              productName: "Acid",
+              category: "Chemical",
+              unit: "LTR",
+              quantity: 150,
+              minThreshold: 10,
+            },
+            {
+              productId: "PD-013",
+              productName: "Bag",
+              category: "Chemical",
+              unit: "PCS",
+              quantity: 100,
+              minThreshold: 5,
+            },
+            {
+              productId: "PD-014",
+              productName: "Bottom",
+              category: "Chemical",
+              unit: "PCS",
+              quantity: 100,
+              minThreshold: 5,
+            },
+          ],
+          l2_component: [
+            {
+              productId: "AS-001",
+              productName: "Positive Plate",
+              unit: "PCS",
+              quantity: 12,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-002",
+              productName: "Negative Plate",
+              unit: "PCS",
+              quantity: 18,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-003",
+              productName: "Separator",
+              unit: "PCS",
+              quantity: 3,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-004",
+              productName: "Container Set",
+              unit: "PCS",
+              quantity: 1,
+              minThreshold: 5,
+            },
+            {
+              productId: "AS-005",
+              productName: "Stool",
+              unit: "KG",
+              quantity: 0.88,
+              minThreshold: 5,
+            },
+            {
+              productId: "AS-006",
+              productName: "Side Packing Jali",
+              unit: "KG",
+              quantity: 0.88,
+              minThreshold: 5,
+            },
+            {
+              productId: "AS-007",
+              productName: "Thermocol",
+              unit: "PCS",
+              quantity: 1,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-008",
+              productName: "Indicator",
+              unit: "PCS",
+              quantity: 6,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-009",
+              productName: "Nutt Bolt",
+              unit: "PCS",
+              quantity: 2,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-010",
+              productName: "Gelly Pouch",
+              unit: "PCS",
+              quantity: 1,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-011",
+              productName: "Terminal Cover",
+              unit: "PCS",
+              quantity: 2,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-012",
+              productName: "Polythene",
+              unit: "PCS",
+              quantity: 2,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-013",
+              productName: "Sticker",
+              unit: "PCS",
+              quantity: 2,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-014",
+              productName: "Box",
+              unit: "PCS",
+              quantity: 1,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-015",
+              productName: "Warranty Card",
+              unit: "PCS",
+              quantity: 1,
+              minThreshold: 10,
+            },
+            {
+              productId: "AS-016",
+              productName: "Acid",
+              unit: "LTR",
+              quantity: 30,
+              minThreshold: 10,
+            },
+          ],
           logs: [],
           productionOrders: [],
           assemblyOrders: [],
@@ -131,26 +351,7 @@ const Inventory = () => {
         >
           L2 Assembly / Inventory
         </button>
-        {/* <button
-          onClick={() => setActiveTab("orders")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "orders"
-              ? "border-b-2 border-yellow-600 text-yellow-600"
-              : "text-gray-600"
-          }`}
-        >
-          Production Orders
-        </button>
-        <button
-          onClick={() => setActiveTab("logs")}
-          className={`px-4 py-2 font-semibold ${
-            activeTab === "logs"
-              ? "border-b-2 border-gray-600 text-gray-600"
-              : "text-gray-600"
-          }`}
-        >
-          Logs
-        </button> */}
+
         <button className="px-4 py-2 font-semibold text-gray-600 hover:text-blue-600">
           setting
         </button>
@@ -162,7 +363,7 @@ const Inventory = () => {
           <h3 className="text-xl font-semibold mb-4 flex justify-between">
             🔹 L1 | Battery Raw Materials
             <button
-              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+              className="px-4 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
               onClick={() => setModalOpen(true)}
             >
               Update
@@ -172,26 +373,47 @@ const Inventory = () => {
           <table className="min-w-full border border-gray-300 rounded-md mb-6">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-4 py-2 border-b">Material</th>
-                <th className="px-4 py-2 border-b">Quantity</th>
+                <th className="px-4 py-2 border-b">Product ID</th>
+                <th className="px-4 py-2 border-b">Product Name</th>
+                <th className="px-4 py-2 border-b">Qty / Unit</th>
               </tr>
             </thead>
             <tbody>
-              {Object.entries(inventory.l1_component || {}).map(
-                ([key, val]) => (
-                  <tr
-                    key={key}
-                    className={
-                      safeNumber(val) <= LOW_STOCK_THRESHOLD
-                        ? "bg-red-100 text-red-800 font-semibold"
-                        : "bg-white"
-                    }
-                  >
-                    <td className="px-4 py-2 border-b capitalize">{key}</td>
-                    <td className="px-4 py-2 border-b">{safeNumber(val)}</td>
-                  </tr>
-                )
-              )}
+              {(() => {
+                const grouped = {};
+                (inventory.l1_component || []).forEach((item) => {
+                  if (!grouped[item.category]) grouped[item.category] = [];
+                  grouped[item.category].push(item);
+                });
+
+                return Object.entries(grouped).map(([category, items]) => (
+                  <React.Fragment key={category}>
+                    <tr className="bg-blue-100 text-left">
+                      <td colSpan={3} className="px-4 py-2 font-bold">
+                        {category}
+                      </td>
+                    </tr>
+                    {items.map((item) => (
+                      <tr
+                        key={item.productId}
+                        className={
+                          safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
+                            ? "bg-red-100 text-red-800 font-semibold"
+                            : "bg-white"
+                        }
+                      >
+                        <td className="px-4 py-2 border-b">{item.productId}</td>
+                        <td className="px-4 py-2 border-b">
+                          {item.productName}
+                        </td>
+                        <td className="px-4 py-2 border-b">
+                          {safeNumber(item.quantity)} {item.unit}
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -205,170 +427,32 @@ const Inventory = () => {
           <table className="min-w-full border border-gray-300 rounded-md mb-6">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-4 py-2 border-b">Component</th>
-                <th className="px-4 py-2 border-b">Quantity</th>
+                <th className="px-4 py-2 border-b">Product ID</th>
+                <th className="px-4 py-2 border-b">Product Name</th>
+                <th className="px-4 py-2 border-b">Qty / Unit</th>
               </tr>
             </thead>
             <tbody>
-              {Object.entries(inventory.l2_component || {}).map(
-                ([key, val]) => (
-                  <tr key={key} className="bg-white">
-                    <td className="px-4 py-2 border-b capitalize">{key}</td>
-                    <td className="px-4 py-2 border-b">{safeNumber(val)}</td>
-                  </tr>
-                )
-              )}
+              {(inventory.l2_component || []).map((item) => (
+                <tr
+                  key={item.productId}
+                  className={
+                    safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
+                      ? "bg-red-100 text-red-800 font-semibold"
+                      : "bg-white"
+                  }
+                >
+                  <td className="px-4 py-2 border-b">{item.productId}</td>
+                  <td className="px-4 py-2 border-b">{item.productName}</td>
+                  <td className="px-4 py-2 border-b">
+                    {safeNumber(item.quantity)} {item.unit}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
-
-      {/* {activeTab === "orders" && (
-        <section>
-          <h3 className="text-xl font-semibold mb-3 border-b border-gray-300 pb-1">
-            🛠️ Production Orders
-          </h3>
-
-          {inventory.productionOrders?.length > 0 ? (
-            <ul className="space-y-6">
-              {inventory.productionOrders.map((order) => {
-                const expectedMaterials = {};
-                const discrepancies = [];
-
-                if (order.status === "completed") {
-                  // Calculate expected material usage
-                  Object.entries(order.materialsUsed || {}).forEach(
-                    ([mat, qty]) => {
-                      expectedMaterials[mat] =
-                        (batteryBOM?.[mat] || 0) *
-                        safeNumber(order.predictedOutput);
-                    }
-                  );
-
-                  // Check for discrepancies
-                  Object.entries(order.materialsUsed || {}).forEach(
-                    ([mat, usedQty]) => {
-                      const expected = expectedMaterials[mat] || 0;
-                      if (safeNumber(usedQty) > expected) {
-                        discrepancies.push(
-                          `${mat}: used ${usedQty}, expected max ${expected}`
-                        );
-                      }
-                    }
-                  );
-
-                  if (
-                    safeNumber(order.actualOutput) <
-                    safeNumber(order.predictedOutput)
-                  ) {
-                    discrepancies.push(
-                      `Actual output ${safeNumber(
-                        order.actualOutput
-                      )} is less than predicted ${safeNumber(
-                        order.predictedOutput
-                      )}`
-                    );
-                  }
-                }
-
-                return (
-                  <li
-                    key={order.id}
-                    className={`shadow rounded p-4 border ${
-                      discrepancies.length > 0
-                        ? "bg-red-100 border-red-300"
-                        : order.status === "completed"
-                        ? "bg-green-100 border-green-300"
-                        : "bg-white border-gray-200"
-                    }`}
-                  >
-                    <p>
-                      <strong>Order #{order.id}</strong> — Status:{" "}
-                      <em className="capitalize">{order.status}</em> — Predicted
-                      Output: {safeNumber(order.predictedOutput)} battery
-                      {safeNumber(order.predictedOutput) !== 1 ? "ies" : ""}
-                    </p>
-
-                    <p>Started At: {order.timestamp}</p>
-
-                    <div className="mt-2">
-                      <p className="font-semibold">Materials Used:</p>
-                      <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
-                        {Object.entries(order.materialsUsed || {}).map(
-                          ([mat, qty]) => (
-                            <li key={mat}>
-                              {mat}: {safeNumber(qty)}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    </div>
-
-                    {order.status === "completed" &&
-                      discrepancies.length > 0 && (
-                        <div className="mt-4 border border-red-50 bg-red-50 text-black-800 p-3 rounded">
-                          <strong className="block mb-1">
-                            ⚠️ Discrepancy Report
-                          </strong>
-                          <ul className="list-disc list-inside text-sm">
-                            {discrepancies.map((d, i) => (
-                              <li key={i}>{d}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="text-gray-500 italic">No production orders yet.</p>
-          )}
-        </section>
-      )}
-
-      {activeTab === "logs" && (
-        <div>
-          <h3 className="text-xl font-semibold mt-10 mb-4">📜 Logs</h3>
-
-          <ul className="space-y-2">
-            {(inventory.logs || []).map((log, idx) => {
-              const isDiscrepancy = log.logType === "discrepency";
-
-              return (
-                <li
-                  key={idx}
-                  className={`border p-4 rounded-md ${
-                    isDiscrepancy
-                      ? "border-red-500 bg-red-50 text-red-800"
-                      : "border-gray-300 bg-white"
-                  }`}
-                >
-                  <div className="text-sm text-gray-500">{log.timestamp}</div>
-
-                  <div className="mt-1 text-base">
-                    {isDiscrepancy ? (
-                      <>
-                        <strong className="block mb-1">
-                          ⚠️ Discrepancy Alert
-                        </strong>
-                        <div className="whitespace-pre-wrap">
-                          {log.action.replace("⚠️ ", "")}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <span>{log.action}</span>
-                        <div>{log?.remarks}</div>
-                      </>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )} */}
 
       {/* Bulk Stock Update Modal */}
       <BulkStockUpdateModal

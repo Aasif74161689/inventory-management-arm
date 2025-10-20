@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import batteryBOM from "../data/batteryBOM";
 import { fetchInventory } from "../firebaseService";
+import Loader from "../components/Loader";
 
 const safeNumber = (val) => (isNaN(val) || val == null ? 0 : Number(val));
 
@@ -24,12 +25,7 @@ export default function History() {
     load();
   }, []);
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
-        <p className="animate-pulse">Loading history...</p>
-      </div>
-    );
+  if (loading) return <Loader />;
 
   const computeDiscrepancies = (order) => {
     const expectedMaterials = {};

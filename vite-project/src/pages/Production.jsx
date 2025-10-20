@@ -5,13 +5,7 @@ import Loader from "../components/Loader";
 
 const Production = () => {
   const [inventory, setInventory] = useState(null);
-  const [materialsInput, setMaterialsInput] = useState({
-    lead: 0,
-    acid: 0,
-    plastic: 0,
-    copper: 0,
-    lithium: 0,
-  });
+  const [materialsInput, setMaterialsInput] = useState({});
   const [predictedOutput, setPredictedOutput] = useState(0);
   const [requiredOutput, setRequiredOutput] = useState("");
   const [actualOutputs, setActualOutputs] = useState({});
@@ -28,40 +22,64 @@ const Production = () => {
     })();
   }, []);
 
-  const handleChange = (e) => {
-    const updated = {
+  // Map BOM productId to inventory l1_component for easier access
+  const l1Map = {};
+  if (inventory?.l1_component) {
+    inventory.l1_component.forEach((item) => {
+      l1Map[item.productId] = item;
+    });
+  }
+
+  // Initialize materialsInput keys based on BOM
+  useEffect(() => {
+    if (batteryBOM && Object.keys(materialsInput).length === 0) {
+      const initial = {};
+      batteryBOM.forEach((bom) => {
+        initial[bom.productId] = 0;
+      });
+      setMaterialsInput(initial);
+    }
+  }, [batteryBOM, materialsInput]);
+
+  const handleChange = (e, productId) => {
+    setMaterialsInput({
       ...materialsInput,
-      [e.target.name]: parseInt(e.target.value, 10) || 0,
-    };
-    setMaterialsInput(updated);
+      [productId]: parseFloat(e.target.value) || 0,
+    });
   };
 
+  // Calculate predicted output based on Required Output input
   useEffect(() => {
-    const times = Object.entries(batteryBOM).map(([mat, req]) => {
-      const entered = materialsInput[mat] || 0;
-      return Math.floor(entered / req);
-    });
-    setPredictedOutput(Math.min(...times));
-  }, [materialsInput]);
+    if (!inventory?.l1_component) return;
+    // Predicted output is what user wants (requiredOutput), but cannot exceed max possible
+    const maxPossible = Math.min(
+      ...batteryBOM.map((bom) => {
+        const available = l1Map[bom.productId]?.quantity || 0;
+        if (bom.qty === 0) return Infinity;
+        return Math.floor(available / bom.qty);
+      })
+    );
+    let output = parseFloat(requiredOutput) || 0;
+    if (output > maxPossible) output = maxPossible;
+    setPredictedOutput(output);
+  }, [requiredOutput, inventory]);
 
   const handleRequiredOutputChange = (e) => {
-    const value = parseInt(e.target.value, 10) || "";
+    const value = parseFloat(e.target.value) || "";
     setRequiredOutput(value);
 
     if (value > 0) {
       const autofill = {};
-      Object.entries(batteryBOM).forEach(([mat, qty]) => {
-        autofill[mat] = qty * value;
+      batteryBOM.forEach((bom) => {
+        autofill[bom.productId] = parseFloat((bom.qty * value).toFixed(4));
       });
       setMaterialsInput(autofill);
     } else {
-      setMaterialsInput({
-        lead: 0,
-        acid: 0,
-        plastic: 0,
-        copper: 0,
-        lithium: 0,
+      const reset = {};
+      batteryBOM.forEach((bom) => {
+        reset[bom.productId] = 0;
       });
+      setMaterialsInput(reset);
     }
   };
 
@@ -73,9 +91,14 @@ const Production = () => {
     const updatedLogs = [...(inventory.logs || [])];
     const updatedOrders = [...(inventory.productionOrders || [])];
 
-    const insufficient = Object.keys(materialsInput).filter(
-      (mat) => (inventory.l1_component?.[mat] || 0) < materialsInput[mat]
-    );
+    // Find insufficient stock
+    const insufficient = batteryBOM
+      .filter(
+        (bom) =>
+          (l1Map[bom.productId]?.quantity || 0) <
+          (materialsInput[bom.productId] || 0)
+      )
+      .map((bom) => bom.productName);
 
     if (insufficient.length > 0) {
       updatedLogs.push({
@@ -91,22 +114,23 @@ const Production = () => {
 
       alert(
         `Not enough stock for: ${insufficient
-          .map(
-            (mat) =>
-              `${mat} (needed: ${materialsInput[mat]}, available: ${
-                inventory.l1_component?.[mat] || 0
-              })`
-          )
+          .map((name) => {
+            const bom = batteryBOM.find((b) => b.productName === name);
+            const prodId = bom.productId;
+            return `${name} (needed: ${materialsInput[prodId]}, available: ${
+              l1Map[prodId]?.quantity || 0
+            })`;
+          })
           .join(", ")}`
       );
       return;
     }
 
     // Deduct stock
-    const updatedMaterials = { ...inventory.l1_component };
-    Object.keys(materialsInput).forEach((mat) => {
-      updatedMaterials[mat] -= materialsInput[mat];
-    });
+    const updatedL1 = inventory.l1_component.map((item) => ({
+      ...item,
+      quantity: item.quantity - (materialsInput[item.productId] || 0),
+    }));
 
     const newOrder = {
       id: updatedOrders.length + 1,
@@ -123,7 +147,7 @@ const Production = () => {
 
     const updatedInventory = {
       ...inventory,
-      l1_component: updatedMaterials,
+      l1_component: updatedL1,
       productionOrders: [...updatedOrders, newOrder],
       logs: updatedLogs,
     };
@@ -132,19 +156,20 @@ const Production = () => {
     await updateInventory(updatedInventory);
 
     // Reset inputs
-    setMaterialsInput({
-      lead: 0,
-      acid: 0,
-      plastic: 0,
-      copper: 0,
-      lithium: 0,
+    const reset = {};
+    batteryBOM.forEach((bom) => {
+      reset[bom.productId] = 0;
     });
+    setMaterialsInput(reset);
     setPredictedOutput(0);
     setRequiredOutput("");
   };
 
   const handleActualOutputChange = (orderId, value) => {
-    setActualOutputs({ ...actualOutputs, [orderId]: parseInt(value, 10) || 0 });
+    setActualOutputs({
+      ...actualOutputs,
+      [orderId]: parseFloat(value) || "",
+    });
   };
 
   const handleCompleteProduction = async (orderId) => {
@@ -164,28 +189,31 @@ const Production = () => {
       { timestamp, action: `✅ Production completed for Order #${orderId}` },
     ];
 
-    // 🔍 Discrepancy detection for both output & material usage
+    // Discrepancy detection for both output & material usage
     let discrepancyMessages = [];
 
-    // 1️⃣ Compare predicted vs actual output
+    // Compare predicted vs actual output
     if (completedOrder && actual !== completedOrder.predictedOutput) {
       discrepancyMessages.push(
         `Output mismatch: Predicted ${completedOrder.predictedOutput}, Actual ${actual}`
       );
     }
 
-    // 2️⃣ Compare materials used vs expected (based on actual output)
+    // Compare materials used vs expected (based on actual output)
     const expectedMaterials = {};
-    Object.entries(batteryBOM).forEach(([mat, qty]) => {
-      expectedMaterials[mat] = qty * actual;
+    batteryBOM.forEach((bom) => {
+      expectedMaterials[bom.productId] = parseFloat(
+        (bom.qty * actual).toFixed(4)
+      );
     });
 
     Object.entries(completedOrder.materialsUsed || {}).forEach(
-      ([mat, used]) => {
-        const expected = expectedMaterials[mat] ?? 0;
+      ([prodId, used]) => {
+        const expected = expectedMaterials[prodId] ?? 0;
         if (used !== expected) {
+          const bom = batteryBOM.find((b) => b.productId === prodId);
           discrepancyMessages.push(
-            `${mat}: used ${used}, expected ${expected}`
+            `${bom?.productName || prodId}: used ${used}, expected ${expected}`
           );
         }
       }
@@ -203,10 +231,7 @@ const Production = () => {
 
     const updatedInventory = {
       ...inventory,
-      l2_component: {
-        ...inventory.l2_component,
-        battery: (inventory.l2_component?.battery || 0) + actual,
-      },
+      l2_component: inventory.l2_component, // No change here, but keep structure
       productionOrders: updatedOrders,
       logs: [...(inventory.logs || []), ...newLogs],
     };
@@ -232,10 +257,11 @@ const Production = () => {
       <div className="border border-gray-300 rounded-md p-4 mb-8 bg-gray-50">
         <h3 className="text-xl font-semibold mb-3">🧾 BOM for 1 Battery</h3>
         <ul className="list-disc list-inside space-y-1 text-gray-700 capitalize">
-          {Object.entries(batteryBOM).map(([mat, qty]) => (
-            <li key={mat}>
-              <span className="font-medium">{mat}</span>: {qty} (Stock:{" "}
-              {inventory.l1_component?.[mat] || 0})
+          {batteryBOM.map((bom) => (
+            <li key={bom.productId}>
+              <span className="font-medium">{bom.name}</span>: {bom.qty} (
+              Stock: {l1Map[bom.productId]?.quantity || 0}{" "}
+              {l1Map[bom.productId]?.unit || ""})
             </li>
           ))}
         </ul>
@@ -261,19 +287,24 @@ const Production = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {Object.keys(batteryBOM).map((mat) => (
-            <div key={mat} className="flex flex-col">
-              <label htmlFor={mat} className="mb-1 font-medium capitalize">
-                {mat}:
+          {batteryBOM.map((bom) => (
+            <div key={bom.productId} className="flex flex-col">
+              <label
+                htmlFor={bom.productId}
+                className="mb-1 font-medium capitalize"
+              >
+                {bom.name} ({l1Map[bom.productId]?.unit || ""}):
               </label>
               <input
-                id={mat}
-                name={mat}
+                id={bom.productId}
+                name={bom.productId}
                 type="number"
                 min="0"
-                value={materialsInput[mat]}
-                onChange={handleChange}
+                step="any"
+                value={materialsInput[bom.productId]}
+                onChange={(e) => handleChange(e, bom.productId)}
                 className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder={`Stock: ${l1Map[bom.productId]?.quantity || 0}`}
               />
             </div>
           ))}
@@ -282,6 +313,20 @@ const Production = () => {
         <p className="text-lg font-semibold">
           🔍 Predicted Output: {predictedOutput} battery
           {predictedOutput !== 1 ? "s" : ""}
+          <span className="ml-2 text-gray-500 text-sm">
+            (Max possible:{" "}
+            {(() => {
+              if (!inventory?.l1_component) return 0;
+              return Math.min(
+                ...batteryBOM.map((bom) => {
+                  const available = l1Map[bom.productId]?.quantity || 0;
+                  if (bom.qty === 0) return Infinity;
+                  return Math.floor(available / bom.qty);
+                })
+              );
+            })()}
+            )
+          </span>
         </p>
 
         <button
@@ -322,32 +367,48 @@ const Production = () => {
                   <div className="mt-2">
                     <p className="font-semibold mb-1">Materials:</p>
                     <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
-                      {Object.entries(order.materialsUsed).map(([mat, qty]) => (
-                        <li key={mat}>
-                          {mat}: {qty}
-                        </li>
-                      ))}
+                      {Object.entries(order.materialsUsed).map(
+                        ([prodId, qty]) => {
+                          const bom = batteryBOM.find(
+                            (b) => b.productId === prodId
+                          );
+                          return (
+                            <li key={prodId}>
+                              {bom?.name || prodId}: {qty}
+                            </li>
+                          );
+                        }
+                      )}
                     </ul>
                   </div>
 
-                  {order.status === "started" && (
-                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4">
-                      <label
-                        htmlFor={`actual-${order.id}`}
-                        className="mr-2 font-medium"
-                      >
-                        🔢 Actual Output:
-                      </label>
-                      <input
-                        id={`actual-${order.id}`}
-                        type="number"
-                        min="0"
-                        value={actualOutputs[order.id] || ""}
-                        onChange={(e) =>
-                          handleActualOutputChange(order.id, e.target.value)
-                        }
-                        className="border border-gray-300 rounded px-3 py-2 w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                  <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+                    <label
+                      htmlFor={`actual-${order.id}`}
+                      className="mr-2 font-medium"
+                    >
+                      🔢 Actual Output:
+                    </label>
+                    <input
+                      id={`actual-${order.id}`}
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={
+                        order.status === "completed"
+                          ? order.actualOutput ?? ""
+                          : actualOutputs[order.id] ?? ""
+                      }
+                      onChange={
+                        order.status === "completed"
+                          ? undefined
+                          : (e) =>
+                              handleActualOutputChange(order.id, e.target.value)
+                      }
+                      className="border border-gray-300 rounded px-3 py-2 w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={order.status === "completed"}
+                    />
+                    {order.status === "started" && (
                       <button
                         onClick={() => handleCompleteProduction(order.id)}
                         disabled={
@@ -358,8 +419,8 @@ const Production = () => {
                       >
                         ✅ Mark as Production Done
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {discrepancy && (
                     <p className="mt-3 text-red-700 bg-red-100 p-2 rounded text-sm">
