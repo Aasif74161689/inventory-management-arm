@@ -9,12 +9,27 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
 
   useEffect(() => {
     if (isOpen && materials) {
-      const items = Object.entries(materials || {}).map(([name, qty]) => ({
-        name,
-        qty: 0, // Start with 0 change, user can add/subtract
-        available: qty,
-        unit: "kg",
-      }));
+      // support two shapes:
+      // 1) materials is an array of product objects (preferred)
+      // 2) materials is a map object { name: qty }
+      let items = [];
+      if (Array.isArray(materials)) {
+        items = materials.map((m) => ({
+          productId: m.productId,
+          productName: m.productName || m.name || m.productId,
+          qty: 0,
+          available: m.quantity ?? m.qty ?? 0,
+          unit: m.unit || "KG",
+        }));
+      } else if (typeof materials === "object") {
+        items = Object.entries(materials || {}).map(([name, qty]) => ({
+          productId: name,
+          productName: name,
+          qty: 0,
+          available: qty,
+          unit: "KG",
+        }));
+      }
       setStockData(items);
       setShowConfirm(false);
       setRemarks("");
@@ -29,7 +44,8 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
 
   const handleChange = (index, value) => {
     const updated = [...stockData];
-    updated[index].qty = Number(value) || 0;
+    // allow decimals
+    updated[index].qty = value === "" ? 0 : Number(value);
     setStockData(updated);
   };
 
@@ -41,26 +57,40 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   const handleConfirmSave = async () => {
     if (!materials) return;
 
-    const updatedL1 = { ...materials };
+    // Build updated l1_component array from stockData
     const changes = [];
     let hasReduction = false;
 
-    stockData.forEach(({ name, qty, available, unit }) => {
-      const newQty = available + qty;
-      if (available !== newQty) {
-        const diff = newQty - available;
+    // We'll start from materials if it's an array, else try to read previous inventory via setInventory
+    const baseArray = Array.isArray(materials)
+      ? materials.map((m) => ({ ...m }))
+      : [];
+
+    stockData.forEach(({ productId, productName, qty, available, unit }) => {
+      const newQty = (available ?? 0) + (qty ?? 0);
+      if ((available ?? 0) !== newQty) {
+        const diff = newQty - (available ?? 0);
         const diffWithSign = diff > 0 ? `+${diff}` : `${diff}`;
-        if (newQty < available) {
+        if (newQty < (available ?? 0)) {
           changes.push(
-            `⚠️ ${name}: ${available} → ${newQty} ${unit} {${diffWithSign}}`
+            `⚠️ ${productName}: ${available} → ${newQty} ${unit} {${diffWithSign}}`
           );
           hasReduction = true;
         } else {
           changes.push(
-            `${name}: ${available} → ${newQty} ${unit} {${diffWithSign}}`
+            `${productName}: ${available} → ${newQty} ${unit} {${diffWithSign}}`
           );
         }
-        updatedL1[name] = newQty;
+
+        // Update or add in baseArray
+        const idx = baseArray.findIndex(
+          (it) => it.productId === productId || it.productName === productName
+        );
+        if (idx !== -1) {
+          baseArray[idx] = { ...baseArray[idx], quantity: newQty };
+        } else {
+          baseArray.push({ productId, productName, unit, quantity: newQty });
+        }
       }
     });
 
@@ -75,16 +105,24 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
         ...(remarks && { remarks }),
       };
 
-      const updatedData = {
-        ...materials,
-        l1_component: updatedL1,
-        logs: [...(materials.logs || []), newLog],
-      };
+      // Build updatedInventory: try to merge with previous inventory via setInventory(prev => ...)
+      let updatedInventory = { l1_component: baseArray, logs: [newLog] };
 
-      setInventory(updatedData);
+      setInventory((prev) => {
+        if (prev && typeof prev === "object") {
+          const merged = {
+            ...prev,
+            l1_component: baseArray,
+            logs: [...(prev.logs || []), newLog],
+          };
+          updatedInventory = merged;
+          return merged;
+        }
+        return updatedInventory;
+      });
 
       try {
-        await updateInventory(updatedData);
+        await updateInventory(updatedInventory);
         console.log("✅ Firebase inventory updated");
       } catch (err) {
         console.error("❌ Firebase update failed:", err);
@@ -98,12 +136,13 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   // Prepare preview data
   const previewChanges = stockData
     .filter(({ qty }) => qty !== 0)
-    .map(({ name, qty, available, unit }) => {
+    .map(({ productId, productName, qty, available, unit }) => {
       const oldQty = available;
       const diff = qty;
       const newQty = available + qty;
       return {
-        name,
+        productId,
+        productName,
         oldQty,
         newQty,
         unit,
@@ -133,9 +172,21 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                   </thead>
                   <tbody>
                     {previewChanges.map(
-                      ({ name, oldQty, newQty, unit, diff }) => (
-                        <tr key={name} className="border-b hover:bg-gray-50">
-                          <td className="capitalize px-4 py-2">{name}</td>
+                      ({
+                        productId,
+                        productName,
+                        oldQty,
+                        newQty,
+                        unit,
+                        diff,
+                      }) => (
+                        <tr
+                          key={productId}
+                          className="border-b hover:bg-gray-50"
+                        >
+                          <td className="capitalize px-4 py-2">
+                            {productName}
+                          </td>
                           <td className="px-4 py-2">
                             {oldQty} {unit}
                           </td>
@@ -203,19 +254,21 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
               <div className="space-y-3">
                 {stockData.map((item, index) => (
                   <div
-                    key={item.name}
+                    key={item.productId || item.productName}
                     className="flex justify-between items-center"
                   >
                     <span className="capitalize">
-                      {item.name} ({item.unit})
+                      {item.productName} ({item.unit}) — Available:{" "}
+                      {item.available}
                     </span>
                     <input
                       type="number"
                       min={-item.available}
-                      placeholder="Update"
+                      step="any"
+                      placeholder={String(item.available)}
                       value={item.qty === 0 ? "" : item.qty}
                       onChange={(e) => handleChange(index, e.target.value)}
-                      className="border px-2 py-1 rounded w-24"
+                      className="border px-2 py-1 rounded w-28 text-right"
                     />
                   </div>
                 ))}

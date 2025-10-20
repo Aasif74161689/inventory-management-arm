@@ -28,31 +28,39 @@ export default function History() {
   if (loading) return <Loader />;
 
   const computeDiscrepancies = (order) => {
-    const expectedMaterials = {};
     const discrepancies = [];
 
     if (order.status === "completed") {
-      Object.entries(order.materialsUsed || {}).forEach(([mat, qty]) => {
-        expectedMaterials[mat] =
-          (batteryBOM?.[mat] || 0) * safeNumber(order.predictedOutput);
+      const actualOutput = safeNumber(order.actualOutput);
+      const predictedOutput = safeNumber(order.predictedOutput);
+
+      // Check output discrepancy
+      if (actualOutput !== predictedOutput) {
+        discrepancies.push(
+          `Output mismatch: Predicted ${predictedOutput}, Actual ${actualOutput}`
+        );
+      }
+
+      // Check material usage against actual output
+      const expectedMaterials = {};
+      batteryBOM.forEach((bom) => {
+        expectedMaterials[bom.productId] = parseFloat(
+          (bom.qty * actualOutput).toFixed(4)
+        );
       });
 
-      Object.entries(order.materialsUsed || {}).forEach(([mat, usedQty]) => {
-        const expected = expectedMaterials[mat] || 0;
-        if (safeNumber(usedQty) > expected) {
+      Object.entries(order.materialsUsed || {}).forEach(([prodId, usedQty]) => {
+        const expected = expectedMaterials[prodId] ?? 0;
+        const used = safeNumber(usedQty);
+
+        if (used !== expected) {
+          const bom = batteryBOM.find((b) => b.productId === prodId);
+          const name = bom?.name || bom?.productName || prodId;
           discrepancies.push(
-            `${mat}: used ${usedQty}, expected max ${expected}`
+            `${name}: used ${used}, expected ${expected} (for ${actualOutput} units)`
           );
         }
       });
-
-      if (safeNumber(order.actualOutput) < safeNumber(order.predictedOutput)) {
-        discrepancies.push(
-          `Actual output ${safeNumber(
-            order.actualOutput
-          )} < predicted ${safeNumber(order.predictedOutput)}`
-        );
-      }
     }
 
     return discrepancies;
@@ -144,7 +152,7 @@ export default function History() {
                   if (productionFilter === "discrepancy")
                     return status === "completed" && discrepancies.length > 0;
 
-                  // Map dropdown value "pending" to actual status
+                  // Map dropdown value "started" to actual status
                   const filterStatus =
                     productionFilter === "started"
                       ? "started"
@@ -190,11 +198,18 @@ export default function History() {
                         <p className="font-semibold mb-1">Materials Used</p>
                         <ul className="list-disc ml-5">
                           {Object.entries(order.materialsUsed || {}).map(
-                            ([mat, qty]) => (
-                              <li key={mat} className="capitalize">
-                                {mat}: {safeNumber(qty)}
-                              </li>
-                            )
+                            ([prodId, qty]) => {
+                              const bom = batteryBOM.find(
+                                (b) => b.productId === prodId
+                              );
+                              const name =
+                                bom?.name || bom?.productName || prodId;
+                              return (
+                                <li key={prodId} className="capitalize">
+                                  {name}: {safeNumber(qty)}
+                                </li>
+                              );
+                            }
                           )}
                         </ul>
                       </div>
@@ -230,6 +245,18 @@ export default function History() {
 
                 // Only check discrepancies if status is completed
                 if (a.status === "completed") {
+                  const actualOutput = safeNumber(a.actualOutput);
+                  const expectedOutput = safeNumber(
+                    a.predictedOutput ?? a.units ?? 0
+                  );
+
+                  // Check output discrepancy
+                  if (actualOutput !== expectedOutput) {
+                    discrepancies.push(
+                      `Output mismatch: Expected ${expectedOutput}, Actual ${actualOutput}`
+                    );
+                  }
+
                   // Check for missing/0 materials
                   Object.entries(a.materialsUsed || {}).forEach(
                     ([mat, qty]) => {
@@ -237,18 +264,6 @@ export default function History() {
                         discrepancies.push(`${mat} is missing or 0`);
                     }
                   );
-
-                  // Check for missing/less actual output
-                  const expectedOutput = safeNumber(
-                    a.predictedOutput ?? a.units ?? 0
-                  );
-                  if (!a.actualOutput || a.actualOutput < expectedOutput) {
-                    discrepancies.push(
-                      `Actual output ${
-                        a.actualOutput ?? 0
-                      } is less than expected ${expectedOutput}`
-                    );
-                  }
                 }
 
                 // Card background logic
