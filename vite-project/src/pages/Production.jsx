@@ -9,6 +9,7 @@ const Production = () => {
   const [predictedOutput, setPredictedOutput] = useState(0);
   const [requiredOutput, setRequiredOutput] = useState("");
   const [actualOutputs, setActualOutputs] = useState({});
+  const [openDetails, setOpenDetails] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -86,6 +87,23 @@ const Production = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inventory) return;
+
+    // Confirm start production with predicted count and material summary
+    const materialSummary = batteryBOM
+      .map(
+        (bom) =>
+          `${bom.productName || bom.name}: ${
+            materialsInput[bom.productId] || 0
+          }`
+      )
+      .join("\n");
+
+    const startConfirm = window.confirm(
+      `Start production?\n\nPredicted output: ${predictedOutput} battery${
+        predictedOutput !== 1 ? "s" : ""
+      }\n\nMaterials to be consumed:\n${materialSummary}\n\nDo you want to continue?`
+    );
+    if (!startConfirm) return;
 
     const timestamp = new Date().toLocaleString();
     const updatedLogs = [...(inventory.logs || [])];
@@ -175,8 +193,15 @@ const Production = () => {
   const handleCompleteProduction = async (orderId) => {
     if (!inventory) return;
 
-    const timestamp = new Date().toLocaleString();
     const actual = actualOutputs[orderId] || 0;
+
+    // Confirm marking production complete
+    const confirmDone = window.confirm(
+      `Mark Order #${orderId} as completed?\n\nActual output: ${actual}\n\nProceed?`
+    );
+    if (!confirmDone) return;
+
+    const timestamp = new Date().toLocaleString();
 
     const updatedOrders = inventory.productionOrders.map((order) =>
       order.id === orderId && order.status !== "completed"
@@ -342,95 +367,155 @@ const Production = () => {
           🛠️ Production Orders
         </h3>
         {inventory.productionOrders?.length > 0 ? (
-          <ul className="space-y-6">
-            {inventory.productionOrders.map((order) => {
-              const discrepancy = inventory.logs?.find(
-                (log) =>
-                  log.action.includes("⚠️") &&
-                  log.action.includes(`Order #${order.id}`)
-              );
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-200 rounded">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-2">Order No</th>
+                  <th className="text-left px-4 py-2">Status</th>
+                  <th className="text-left px-4 py-2">Date</th>
+                  <th className="text-left px-4 py-2">
+                    Output (Predicted / Actual)
+                  </th>
+                  <th className="text-left px-4 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventory.productionOrders
+                  .slice()
+                  .reverse()
+                  .map((order) => {
+                    const discrepancy = inventory.logs?.find(
+                      (log) =>
+                        log.action.includes("⚠️") &&
+                        log.action.includes(`Order #${order.id}`)
+                    );
 
-              return (
-                <li
-                  key={order.id}
-                  className="bg-white shadow rounded p-4 border border-gray-200"
-                >
-                  <p className="font-semibold text-lg mb-2">
-                    Order #{order.id}
-                  </p>
-                  <p>
-                    Predicted Output:{" "}
-                    <span className="font-medium">{order.predictedOutput}</span>
-                  </p>
-                  <p>Started At: {order.timestamp}</p>
+                    const statusLabel =
+                      order.status === "started" ? "In Progress" : "Completed";
+                    // determine actual value to compare (completed orders have order.actualOutput,
+                    // in-progress orders may have a pending value in actualOutputs)
+                    const actualValRaw =
+                      order.actualOutput ?? actualOutputs[order.id] ?? null;
+                    const actualVal = actualValRaw === "" ? null : actualValRaw;
+                    const predNum = Number(order.predictedOutput) || 0;
+                    const actNum =
+                      actualVal != null ? Number(actualVal) || 0 : null;
 
-                  <div className="mt-2">
-                    <p className="font-semibold mb-1">Materials:</p>
-                    <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
-                      {Object.entries(order.materialsUsed).map(
-                        ([prodId, qty]) => {
-                          const bom = batteryBOM.find(
-                            (b) => b.productId === prodId
-                          );
-                          return (
-                            <li key={prodId}>
-                              {bom?.name || prodId}: {qty}
-                            </li>
-                          );
-                        }
-                      )}
-                    </ul>
-                  </div>
+                    let outputClass = "text-gray-700";
+                    if (actNum != null) {
+                      if (predNum < actNum)
+                        outputClass = "text-red-600 font-semibold";
+                      // over-produced
+                      else if (predNum === actNum)
+                        outputClass = "text-green-600 font-semibold"; // matched
+                      else outputClass = "text-gray-700"; // under-produced or neutral
+                    }
 
-                  <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4">
-                    <label
-                      htmlFor={`actual-${order.id}`}
-                      className="mr-2 font-medium"
-                    >
-                      🔢 Actual Output:
-                    </label>
-                    <input
-                      id={`actual-${order.id}`}
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={
-                        order.status === "completed"
-                          ? order.actualOutput ?? ""
-                          : actualOutputs[order.id] ?? ""
-                      }
-                      onChange={
-                        order.status === "completed"
-                          ? undefined
-                          : (e) =>
-                              handleActualOutputChange(order.id, e.target.value)
-                      }
-                      className="border border-gray-300 rounded px-3 py-2 w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      disabled={order.status === "completed"}
-                    />
-                    {order.status === "started" && (
-                      <button
-                        onClick={() => handleCompleteProduction(order.id)}
-                        disabled={
-                          actualOutputs[order.id] == null ||
-                          actualOutputs[order.id] < 0
-                        }
-                        className="mt-2 sm:mt-0 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50 transition"
-                      >
-                        ✅ Mark as Production Done
-                      </button>
-                    )}
-                  </div>
+                    return (
+                      <React.Fragment key={order.id}>
+                        <tr className="border-t hover:bg-gray-50">
+                          <td className="px-4 py-3">#{order.id}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-1 rounded text-sm font-medium ${
+                                order.status === "started"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {statusLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">{order.timestamp}</td>
+                          <td className={`px-4 py-3 ${outputClass}`}>
+                            {order.predictedOutput} /{" "}
+                            {order.actualOutput ??
+                              actualOutputs[order.id] ??
+                              "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() =>
+                                  setOpenDetails((prev) =>
+                                    prev === order.id ? null : order.id
+                                  )
+                                }
+                                className="text-sm text-blue-600 hover:underline"
+                              >
+                                View Details
+                              </button>
 
-                  {discrepancy && (
-                    <p className="mt-3 text-red-700 bg-red-100 p-2 rounded text-sm">
-                      ⚠️ {discrepancy.action}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                              {order.status === "started" && (
+                                <>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={actualOutputs[order.id] ?? ""}
+                                    onChange={(e) =>
+                                      handleActualOutputChange(
+                                        order.id,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="border border-gray-300 rounded px-2 py-1 w-20"
+                                    placeholder="Actual"
+                                  />
+                                  <button
+                                    onClick={() =>
+                                      handleCompleteProduction(order.id)
+                                    }
+                                    disabled={
+                                      actualOutputs[order.id] == null ||
+                                      actualOutputs[order.id] < 0
+                                    }
+                                    className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+                                  >
+                                    Mark Done
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+
+                        {openDetails === order.id && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={5} className="px-4 py-3">
+                              <div className="space-y-2">
+                                <p className="font-semibold">Materials Used:</p>
+                                <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
+                                  {Object.entries(order.materialsUsed).map(
+                                    ([prodId, qty]) => {
+                                      const bom = batteryBOM.find(
+                                        (b) => b.productId === prodId
+                                      );
+                                      return (
+                                        <li key={prodId}>
+                                          {bom?.name || prodId}: {qty}
+                                        </li>
+                                      );
+                                    }
+                                  )}
+                                </ul>
+
+                                {discrepancy && (
+                                  <p className="mt-2 text-red-700 bg-red-100 p-2 rounded text-sm">
+                                    ⚠️ {discrepancy.action}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <p className="text-gray-500 italic">No production orders.</p>
         )}
