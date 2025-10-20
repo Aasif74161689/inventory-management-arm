@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; // add this at the top
-import batteryBOM from "../data/batteryBOM";
 import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
 import {
   fetchInventory,
@@ -258,7 +257,34 @@ const Inventory = () => {
           productionOrders: [],
           assemblyOrders: [],
           finalProducts: 0,
-          batteryBOM: { lead: 2, acid: 1, plastic: 1, copper: 1, lithium: 1 },
+          batteryBOM: [
+            { productId: "PD-001", name: "Positive Jali", qty: 0.251 },
+            { productId: "PD-002", name: "Negative Jali", qty: 0.152 },
+            { productId: "PD-003", name: "Part Die", qty: 1.5 },
+            {
+              productId: "PD-004",
+              name: "Positive Filling (Oxide)",
+              qty: 0.258,
+            },
+            {
+              productId: "PD-005",
+              name: "Negative Pasting (Oxide)",
+              qty: 0.312,
+            },
+            {
+              productId: "PD-006",
+              name: "Positive Filling (Red Oxide)",
+              qty: 0.086,
+            },
+            { productId: "PD-007", name: "Berium", qty: 0.003125 },
+            { productId: "PD-008", name: "Carbon", qty: 0.00078125 },
+            { productId: "PD-009", name: "Lignin", qty: 0.0009375 },
+            { productId: "PD-010", name: "Fibre", qty: 0.000375 },
+            { productId: "PD-011", name: "DM Water", qty: 0.03125 },
+            { productId: "PD-012", name: "Acid", qty: 0.019375 },
+            { productId: "PD-013", name: "Bag", qty: 1 },
+            { productId: "PD-014", name: "Bottom", qty: 1 },
+          ],
         });
         data = await fetchInventory();
       }
@@ -510,17 +536,17 @@ const Inventory = () => {
                           onClick={async () => {
                             const input = window.prompt(
                               `Enter new BOM qty for ${item.productName} (per unit):`,
-                              item.bomQty ?? ""
+                              item.qty ?? ""
                             );
                             if (input == null) return;
                             const val = parseFloat(input);
                             if (isNaN(val)) return alert("Invalid number");
                             setInventory((prev) => {
                               const copy = { ...prev };
-                              copy.l1_component = (copy.l1_component || []).map(
+                              copy.batteryBOM = (copy.batteryBOM || []).map(
                                 (it) =>
                                   it.productId === item.productId
-                                    ? { ...it, bomQty: val }
+                                    ? { ...it, qty: val }
                                     : it
                               );
                               updateInventory(copy).catch((e) =>

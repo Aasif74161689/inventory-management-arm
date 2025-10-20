@@ -1,6 +1,7 @@
 // src/components/BatteryBOMUpdateModal.jsx
 import React, { useState, useEffect } from "react";
-import batteryBOMData from "../data/batteryBOM";
+import { updateInventory } from "../firebaseService";
+// batteryBOM is stored in inventory.batteryBOM
 
 const BatteryBOMUpdateModal = ({
   isOpen,
@@ -8,46 +9,49 @@ const BatteryBOMUpdateModal = ({
   inventory,
   setInventory,
 }) => {
-  const [bom, setBOM] = useState({});
+  const [bom, setBOM] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
-      setBOM({ ...batteryBOMData });
+      setBOM(
+        Array.isArray(inventory?.batteryBOM) ? [...inventory.batteryBOM] : []
+      );
     }
-  }, [isOpen]);
+  }, [isOpen, inventory]);
 
   if (!isOpen) return null;
 
-  const handleChange = (material, value) => {
+  const handleChange = (productId, value) => {
     const newVal = parseFloat(value) || 0;
-    setBOM((prev) => ({ ...prev, [material]: newVal }));
+    setBOM((prev) =>
+      prev.map((b) => (b.productId === productId ? { ...b, qty: newVal } : b))
+    );
   };
 
-  const handleSave = () => {
-    // ✅ Update batteryBOM data (in-memory)
-    Object.keys(bom).forEach((key) => {
-      batteryBOMData[key] = bom[key];
-    });
-
-    // ✅ Safe check for logs array
+  const handleSave = async () => {
+    // Persist updated BOM array into inventory and add a log
     const existingLogs = inventory?.logs || [];
-
     const timestamp = new Date().toLocaleString();
     const updatedLogs = [
       ...existingLogs,
       {
         timestamp,
-        action: `🔧 Battery BOM updated: ${Object.entries(bom)
-          .map(([k, v]) => `${k}=${v}`)
-          .join(", ")}`,
+        action: `🔧 Battery BOM updated`,
       },
     ];
 
-    // ✅ Safely update inventory
-    setInventory({
+    const updatedInventory = {
       ...inventory,
+      batteryBOM: bom,
       logs: updatedLogs,
-    });
+    };
+
+    setInventory(updatedInventory);
+    try {
+      await updateInventory(updatedInventory);
+    } catch (e) {
+      console.error(e);
+    }
 
     onClose();
   };
@@ -58,14 +62,20 @@ const BatteryBOMUpdateModal = ({
         <h2 className="text-xl font-bold mb-4">Update Battery BOM</h2>
 
         <div className="space-y-3">
-          {Object.entries(bom).map(([material, qty]) => (
-            <div key={material} className="flex justify-between items-center">
-              <span className="capitalize">{material}</span>
+          {bom.map((b) => (
+            <div
+              key={b.productId}
+              className="flex justify-between items-center"
+            >
+              <span className="capitalize">
+                {b.name || b.productName || b.productId}
+              </span>
               <input
                 type="number"
                 min="0"
-                value={qty}
-                onChange={(e) => handleChange(material, e.target.value)}
+                step="any"
+                value={b.qty}
+                onChange={(e) => handleChange(b.productId, e.target.value)}
                 className="border px-2 py-1 rounded w-24"
               />
             </div>

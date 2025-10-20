@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import batteryBOM from "../data/batteryBOM";
+// batteryBOM will be read from inventory.batteryBOM (loaded from Firestore)
 import { fetchInventory } from "../firebaseService";
 import Loader from "../components/Loader";
 
@@ -43,7 +43,8 @@ export default function History() {
 
       // Check material usage against actual output
       const expectedMaterials = {};
-      batteryBOM.forEach((bom) => {
+      const bomSource = inventory?.batteryBOM || [];
+      bomSource.forEach((bom) => {
         expectedMaterials[bom.productId] = parseFloat(
           (bom.qty * actualOutput).toFixed(4)
         );
@@ -54,7 +55,9 @@ export default function History() {
         const used = safeNumber(usedQty);
 
         if (used !== expected) {
-          const bom = batteryBOM.find((b) => b.productId === prodId);
+          const bom = (inventory?.batteryBOM || []).find(
+            (b) => b.productId === prodId
+          );
           const name = bom?.name || bom?.productName || prodId;
           discrepancies.push(
             `${name}: used ${used}, expected ${expected} (for ${actualOutput} units)`
@@ -199,7 +202,7 @@ export default function History() {
                         <ul className="list-disc ml-5">
                           {Object.entries(order.materialsUsed || {}).map(
                             ([prodId, qty]) => {
-                              const bom = batteryBOM.find(
+                              const bom = inventory?.batteryBOM.find(
                                 (b) => b.productId === prodId
                               );
                               const name =

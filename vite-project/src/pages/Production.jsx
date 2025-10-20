@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import batteryBOM from "../data/batteryBOM";
 import { fetchInventory, updateInventory } from "../firebaseService";
 import Loader from "../components/Loader";
 
@@ -23,6 +22,9 @@ const Production = () => {
     })();
   }, []);
 
+  // Use BOM from inventory if present, otherwise fallback to empty array
+  const effectiveBOM = inventory?.batteryBOM || [];
+
   // Map BOM productId to inventory l1_component for easier access
   const l1Map = {};
   if (inventory?.l1_component) {
@@ -33,14 +35,18 @@ const Production = () => {
 
   // Initialize materialsInput keys based on BOM
   useEffect(() => {
-    if (batteryBOM && Object.keys(materialsInput).length === 0) {
+    if (
+      effectiveBOM &&
+      effectiveBOM.length > 0 &&
+      Object.keys(materialsInput).length === 0
+    ) {
       const initial = {};
-      batteryBOM.forEach((bom) => {
+      effectiveBOM.forEach((bom) => {
         initial[bom.productId] = 0;
       });
       setMaterialsInput(initial);
     }
-  }, [batteryBOM, materialsInput]);
+  }, [effectiveBOM, materialsInput]);
 
   const handleChange = (e, productId) => {
     setMaterialsInput({
@@ -53,13 +59,15 @@ const Production = () => {
   useEffect(() => {
     if (!inventory?.l1_component) return;
     // Predicted output is what user wants (requiredOutput), but cannot exceed max possible
-    const maxPossible = Math.min(
-      ...batteryBOM.map((bom) => {
-        const available = l1Map[bom.productId]?.quantity || 0;
-        if (bom.qty === 0) return Infinity;
-        return Math.floor(available / bom.qty);
-      })
-    );
+    const maxPossible = effectiveBOM.length
+      ? Math.min(
+          ...effectiveBOM.map((bom) => {
+            const available = l1Map[bom.productId]?.quantity || 0;
+            if (bom.qty === 0) return Infinity;
+            return Math.floor(available / bom.qty);
+          })
+        )
+      : 0;
     let output = parseFloat(requiredOutput) || 0;
     if (output > maxPossible) output = maxPossible;
     setPredictedOutput(output);
@@ -71,13 +79,13 @@ const Production = () => {
 
     if (value > 0) {
       const autofill = {};
-      batteryBOM.forEach((bom) => {
+      effectiveBOM.forEach((bom) => {
         autofill[bom.productId] = parseFloat((bom.qty * value).toFixed(4));
       });
       setMaterialsInput(autofill);
     } else {
       const reset = {};
-      batteryBOM.forEach((bom) => {
+      effectiveBOM.forEach((bom) => {
         reset[bom.productId] = 0;
       });
       setMaterialsInput(reset);
@@ -89,7 +97,7 @@ const Production = () => {
     if (!inventory) return;
 
     // Confirm start production with predicted count and material summary
-    const materialSummary = batteryBOM
+    const materialSummary = effectiveBOM
       .map(
         (bom) =>
           `${bom.productName || bom.name}: ${
@@ -110,7 +118,7 @@ const Production = () => {
     const updatedOrders = [...(inventory.productionOrders || [])];
 
     // Find insufficient stock
-    const insufficient = batteryBOM
+    const insufficient = effectiveBOM
       .filter(
         (bom) =>
           (l1Map[bom.productId]?.quantity || 0) <
@@ -133,7 +141,7 @@ const Production = () => {
       alert(
         `Not enough stock for: ${insufficient
           .map((name) => {
-            const bom = batteryBOM.find((b) => b.productName === name);
+            const bom = effectiveBOM.find((b) => b.productName === name);
             const prodId = bom.productId;
             return `${name} (needed: ${materialsInput[prodId]}, available: ${
               l1Map[prodId]?.quantity || 0
@@ -175,7 +183,7 @@ const Production = () => {
 
     // Reset inputs
     const reset = {};
-    batteryBOM.forEach((bom) => {
+    effectiveBOM.forEach((bom) => {
       reset[bom.productId] = 0;
     });
     setMaterialsInput(reset);
@@ -226,7 +234,7 @@ const Production = () => {
 
     // Compare materials used vs expected (based on actual output)
     const expectedMaterials = {};
-    batteryBOM.forEach((bom) => {
+    effectiveBOM.forEach((bom) => {
       expectedMaterials[bom.productId] = parseFloat(
         (bom.qty * actual).toFixed(4)
       );
@@ -236,7 +244,7 @@ const Production = () => {
       ([prodId, used]) => {
         const expected = expectedMaterials[prodId] ?? 0;
         if (used !== expected) {
-          const bom = batteryBOM.find((b) => b.productId === prodId);
+          const bom = effectiveBOM.find((b) => b.productId === prodId);
           discrepancyMessages.push(
             `${bom?.productName || prodId}: used ${used}, expected ${expected}`
           );
@@ -287,8 +295,8 @@ const Production = () => {
         <div className="flex gap-12">
           {/* Split array into two halves */}
           {[
-            batteryBOM.slice(0, Math.ceil(batteryBOM.length / 2)),
-            batteryBOM.slice(Math.ceil(batteryBOM.length / 2)),
+            effectiveBOM.slice(0, Math.ceil(effectiveBOM.length / 2)),
+            effectiveBOM.slice(Math.ceil(effectiveBOM.length / 2)),
           ].map((half, idx) => (
             <ul
               key={idx}
@@ -326,7 +334,7 @@ const Production = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {batteryBOM.map((bom) => (
+          {effectiveBOM.map((bom) => (
             <div key={bom.productId} className="flex flex-col">
               <label
                 htmlFor={bom.productId}
@@ -357,7 +365,7 @@ const Production = () => {
             {(() => {
               if (!inventory?.l1_component) return 0;
               return Math.min(
-                ...batteryBOM.map((bom) => {
+                ...effectiveBOM.map((bom) => {
                   const available = l1Map[bom.productId]?.quantity || 0;
                   if (bom.qty === 0) return Infinity;
                   return Math.floor(available / bom.qty);
@@ -503,7 +511,7 @@ const Production = () => {
                                 <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
                                   {Object.entries(order.materialsUsed).map(
                                     ([prodId, qty]) => {
-                                      const bom = batteryBOM.find(
+                                      const bom = effectiveBOM.find(
                                         (b) => b.productId === prodId
                                       );
                                       return (
