@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-// batteryBOM will be read from inventory.batteryBOM (loaded from Firestore)
+// plateBOM will be read from inventory.plateBOM (loaded from Firestore)
 import { fetchInventory } from "../firebaseService";
 import Loader from "../components/Loader";
 
@@ -43,7 +43,7 @@ export default function History() {
 
       // Check material usage against actual output
       const expectedMaterials = {};
-      const bomSource = inventory?.batteryBOM || [];
+      const bomSource = inventory?.plateBOM || [];
       bomSource.forEach((bom) => {
         expectedMaterials[bom.productId] = parseFloat(
           (bom.qty * actualOutput).toFixed(4)
@@ -55,7 +55,7 @@ export default function History() {
         const used = safeNumber(usedQty);
 
         if (used !== expected) {
-          const bom = (inventory?.batteryBOM || []).find(
+          const bom = (inventory?.plateBOM || []).find(
             (b) => b.productId === prodId
           );
           const name = bom?.name || bom?.productName || prodId;
@@ -202,7 +202,7 @@ export default function History() {
                         <ul className="list-disc ml-5">
                           {Object.entries(order.materialsUsed || {}).map(
                             ([prodId, qty]) => {
-                              const bom = inventory?.batteryBOM.find(
+                              const bom = inventory?.plateBOM.find(
                                 (b) => b.productId === prodId
                               );
                               const name =

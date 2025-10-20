@@ -255,7 +255,7 @@ const Inventory = () => {
           productionOrders: [],
           assemblyOrders: [],
           finalProducts: 0,
-          batteryBOM: [
+          plateBOM: [
             { productId: "PD-001", name: "Positive Jali", qty: 0.251 },
             { productId: "PD-002", name: "Negative Jali", qty: 0.152 },
             { productId: "PD-003", name: "Part Die", qty: 1.5 },
@@ -563,12 +563,24 @@ const Inventory = () => {
                             if (isNaN(val)) return alert("Invalid number");
                             setInventory((prev) => {
                               const copy = { ...prev };
-                              copy.batteryBOM = (copy.batteryBOM || []).map(
-                                (it) =>
-                                  it.productId === item.productId
-                                    ? { ...it, qty: val }
-                                    : it
+                              // find previous BOM entry before mutating
+                              const prevEntry = (copy.plateBOM || []).find(
+                                (it) => it.productId === item.productId
                               );
+                              const prevQty = prevEntry ? prevEntry.qty : "N/A";
+
+                              copy.plateBOM = (copy.plateBOM || []).map((it) =>
+                                it.productId === item.productId
+                                  ? { ...it, qty: val }
+                                  : it
+                              );
+                              copy.logs = [
+                                ...(copy.logs || []),
+                                {
+                                  timestamp: new Date().toISOString(),
+                                  action: `Updated BOM qty for ${item.productName} (${item.productId}) from ${prevQty} to ${val}`,
+                                },
+                              ];
                               updateInventory(copy)
                                 .then(() => toast.success("BOM updated"))
                                 .catch((e) => {
@@ -600,6 +612,13 @@ const Inventory = () => {
                                     ? { ...it, minThreshold: val }
                                     : it
                               );
+                              copy.logs = [
+                                ...(copy.logs || []),
+                                {
+                                  timestamp: new Date().toISOString(),
+                                  action: `Updated Threshold for ${item.productName} from ${item.minThreshold} to ${val}`,
+                                },
+                              ];
                               updateInventory(copy)
                                 .then(() => toast.success("Threshold updated"))
                                 .catch((e) => {

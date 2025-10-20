@@ -23,7 +23,7 @@ const Production = () => {
   }, []);
 
   // Use BOM from inventory if present, otherwise fallback to empty array
-  const effectiveBOM = inventory?.batteryBOM || [];
+  const effectiveBOM = inventory?.plateBOM || [];
 
   // Map BOM productId to inventory l1_component for easier access
   const l1Map = {};

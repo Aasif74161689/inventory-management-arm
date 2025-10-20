@@ -1,7 +1,7 @@
 // src/components/BatteryBOMUpdateModal.jsx
 import React, { useState, useEffect } from "react";
 import { updateInventory } from "../firebaseService";
-// batteryBOM is stored in inventory.batteryBOM
+// plateBOM is stored in inventory.plateBOM
 
 const BatteryBOMUpdateModal = ({
   isOpen,
@@ -13,9 +13,7 @@ const BatteryBOMUpdateModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      setBOM(
-        Array.isArray(inventory?.batteryBOM) ? [...inventory.batteryBOM] : []
-      );
+      setBOM(Array.isArray(inventory?.plateBOM) ? [...inventory.plateBOM] : []);
     }
   }, [isOpen, inventory]);
 
@@ -42,7 +40,7 @@ const BatteryBOMUpdateModal = ({
 
     const updatedInventory = {
       ...inventory,
-      batteryBOM: bom,
+      plateBOM: bom,
       logs: updatedLogs,
     };
 

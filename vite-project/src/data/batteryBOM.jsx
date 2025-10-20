@@ -1,5 +1,5 @@
-// src/data/batteryBOM.js
-const batteryBOM = [
+// src/data/plateBOM.js
+const plateBOM = [
   { productId: "PD-001", name: "Positive Jali", qty: 0.251 },
   { productId: "PD-002", name: "Negative Jali", qty: 0.152 },
   { productId: "PD-003", name: "Part Die", qty: 1.5 },
@@ -16,4 +16,4 @@ const batteryBOM = [
   { productId: "PD-014", name: "Bottom", qty: 1 },
 ];
 
-export default batteryBOM;
+export default plateBOM;
