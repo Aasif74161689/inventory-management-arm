@@ -7,12 +7,12 @@ import {
   updateInventory,
 } from "../firebaseService";
 import Loader from "../components/Loader";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const LOW_STOCK_THRESHOLD = 10;
 
 const Inventory = () => {
-  const navigate = useNavigate(); // inside your component
-
   const [inventory, setInventory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -549,9 +549,12 @@ const Inventory = () => {
                                     ? { ...it, qty: val }
                                     : it
                               );
-                              updateInventory(copy).catch((e) =>
-                                console.error(e)
-                              );
+                              updateInventory(copy)
+                                .then(() => toast.success("BOM updated"))
+                                .catch((e) => {
+                                  console.error(e);
+                                  toast.error("Failed to update BOM");
+                                });
                               return copy;
                             });
                           }}
@@ -577,9 +580,12 @@ const Inventory = () => {
                                     ? { ...it, minThreshold: val }
                                     : it
                               );
-                              updateInventory(copy).catch((e) =>
-                                console.error(e)
-                              );
+                              updateInventory(copy)
+                                .then(() => toast.success("Threshold updated"))
+                                .catch((e) => {
+                                  console.error(e);
+                                  toast.error("Failed to update threshold");
+                                });
                               return copy;
                             });
                           }}
@@ -643,9 +649,12 @@ const Inventory = () => {
                                     ? { ...it, bomQty: val }
                                     : it
                               );
-                              updateInventory(copy).catch((e) =>
-                                console.error(e)
-                              );
+                              updateInventory(copy)
+                                .then(() => toast.success("BOM updated"))
+                                .catch((e) => {
+                                  console.error(e);
+                                  toast.error("Failed to update BOM");
+                                });
                               return copy;
                             });
                           }}
@@ -671,9 +680,12 @@ const Inventory = () => {
                                     ? { ...it, minThreshold: val }
                                     : it
                               );
-                              updateInventory(copy).catch((e) =>
-                                console.error(e)
-                              );
+                              updateInventory(copy)
+                                .then(() => toast.success("Threshold updated"))
+                                .catch((e) => {
+                                  console.error(e);
+                                  toast.error("Failed to update threshold");
+                                });
                               return copy;
                             });
                           }}
@@ -697,6 +709,7 @@ const Inventory = () => {
         materials={inventory.l1_component}
         setInventory={setInventory}
       />
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

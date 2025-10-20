@@ -1,6 +1,8 @@
 // ...existing code...
 import React, { useState, useEffect } from "react";
 import { updateInventory } from "../firebaseService";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   const [stockData, setStockData] = useState([]);
@@ -123,9 +125,11 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
 
       try {
         await updateInventory(updatedInventory);
+        toast.success("Inventory updated successfully");
         console.log("✅ Firebase inventory updated");
       } catch (err) {
         console.error("❌ Firebase update failed:", err);
+        toast.error("Failed to update inventory");
       }
     }
 
