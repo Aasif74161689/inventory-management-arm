@@ -424,7 +424,7 @@ const Production = () => {
 
                     let outputClass = "text-gray-700";
                     if (actNum != null) {
-                      if (predNum < actNum)
+                      if (predNum > actNum)
                         outputClass = "text-red-600 font-semibold";
                       // over-produced
                       else if (predNum === actNum)
@@ -521,11 +521,11 @@ const Production = () => {
                                   )}
                                 </ul>
 
-                                {/* {discrepancy && (
+                                {discrepancy && (
                                   <p className="mt-2 text-red-700 bg-red-100 p-2 rounded text-sm">
                                     ⚠️ {discrepancy.action}
                                   </p>
-                                )} */}
+                                )}
                               </div>
                             </td>
                           </tr>

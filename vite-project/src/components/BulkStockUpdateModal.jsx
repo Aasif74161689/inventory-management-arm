@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { updateInventory } from "../firebaseService";
 import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   const [stockData, setStockData] = useState([]);
@@ -154,23 +155,35 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
     });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-96 max-h-[80vh] overflow-y-auto shadow-lg">
-        <h3 className="text-xl font-bold mb-4">🔧 Update Stock</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 px-4 sm:px-0">
+      <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-[700px] max-h-[85vh] shadow-lg overflow-y-auto">
+        <h3 className="text-lg sm:text-xl font-bold mb-4 text-center">
+          🔧 Update Stock
+        </h3>
 
         {showConfirm ? (
           <div>
-            <h4 className="text-lg font-semibold mb-3">Confirm Changes</h4>
+            <h4 className="text-base sm:text-lg font-semibold mb-3 text-center sm:text-left">
+              Confirm Changes
+            </h4>
 
             {previewChanges.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-300 rounded-lg">
+                <table className="min-w-full border border-gray-300 rounded-lg text-sm sm:text-base">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="text-left px-4 py-2 border-b">Item</th>
-                      <th className="text-left px-4 py-2 border-b">Old</th>
-                      <th className="text-left px-4 py-2 border-b">Change</th>
-                      <th className="text-left px-4 py-2 border-b">New</th>
+                      <th className="text-left px-2 sm:px-4 py-2 border-b">
+                        Item
+                      </th>
+                      <th className="text-left px-2 sm:px-4 py-2 border-b">
+                        Old
+                      </th>
+                      <th className="text-left px-2 sm:px-4 py-2 border-b">
+                        Change
+                      </th>
+                      <th className="text-left px-2 sm:px-4 py-2 border-b">
+                        New
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -187,14 +200,14 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                           key={productId}
                           className="border-b hover:bg-gray-50"
                         >
-                          <td className="capitalize px-4 py-2">
+                          <td className="capitalize px-2 sm:px-4 py-2">
                             {productName}
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-2 sm:px-4 py-2">
                             {oldQty} {unit}
                           </td>
                           <td
-                            className={`px-4 py-2 font-semibold ${
+                            className={`px-2 sm:px-4 py-2 font-semibold ${
                               diff > 0
                                 ? "text-green-600"
                                 : diff < 0
@@ -204,7 +217,7 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                           >
                             {diff > 0 ? `+${diff}` : diff}
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-2 sm:px-4 py-2">
                             {newQty} {unit}
                           </td>
                         </tr>
@@ -214,7 +227,9 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                 </table>
               </div>
             ) : (
-              <p className="text-gray-500">No changes detected.</p>
+              <p className="text-gray-500 text-center sm:text-left">
+                No changes detected.
+              </p>
             )}
 
             {/* Remarks input */}
@@ -229,22 +244,22 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                 id="remarks"
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                className="border rounded px-2 py-1 w-full resize-none"
+                className="border rounded px-2 py-1 w-full resize-none text-sm sm:text-base"
                 rows={2}
                 placeholder="Add remarks for this update..."
               />
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex flex-col sm:flex-row justify-end sm:space-x-3 mt-6 space-y-2 sm:space-y-0">
               <button
                 onClick={() => setShowConfirm(false)}
-                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 text-sm sm:text-base"
               >
                 Back
               </button>
               <button
                 onClick={handleConfirmSave}
-                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base disabled:opacity-50"
                 disabled={previewChanges.length === 0}
               >
                 Confirm & Save
@@ -254,19 +269,18 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
         ) : (
           <>
             {stockData.length > 0 ? (
-              <div className="flex gap-12">
-                {/* Split stockData into two halves */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-12">
                 {[
                   stockData.slice(0, Math.ceil(stockData.length / 2)),
                   stockData.slice(Math.ceil(stockData.length / 2)),
                 ].map((half, idx) => (
-                  <div key={idx} className="flex-1 space-y-3">
-                    {half.map((item, index) => (
+                  <div key={idx} className="space-y-3">
+                    {half.map((item) => (
                       <div
                         key={item.productId || item.productName}
                         className="flex justify-between items-center"
                       >
-                        <span className="capitalize">
+                        <span className="capitalize text-sm sm:text-base">
                           {item.productName} ({item.unit})
                         </span>
                         <input
@@ -277,11 +291,11 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                           value={item.qty === 0 ? "" : item.qty}
                           onChange={(e) =>
                             handleChange(
-                              stockData.indexOf(item), // keep correct index reference
+                              stockData.indexOf(item),
                               e.target.value
                             )
                           }
-                          className="border px-2 py-1 rounded w-28 text-right"
+                          className="border px-2 py-1 rounded w-20 sm:w-28 text-right text-sm sm:text-base"
                         />
                       </div>
                     ))}
@@ -289,21 +303,21 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-6">
+              <p className="text-gray-500 text-center py-6 text-sm sm:text-base">
                 ⚠️ No inventory data found.
               </p>
             )}
 
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex flex-col sm:flex-row justify-end sm:space-x-3 mt-6 space-y-2 sm:space-y-0">
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 text-sm sm:text-base"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePreview}
-                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm sm:text-base disabled:opacity-50"
                 disabled={stockData.length === 0}
               >
                 Preview & Save
