@@ -1,5 +1,6 @@
 // src/App.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
+import Loader from "./components/Loader";
 import {
   Routes,
   Route,
@@ -9,23 +10,27 @@ import {
 } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
-
-import Inventory from "./pages/Inventory";
-import Production from "./pages/Production";
-import Assembly from "./pages/Assembly";
-import History from "./pages/History";
-import LoginPage from "./pages/LoginPage";
+import { ToastContainer } from "react-toastify";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+// ✅ Lazy-loaded pages
+const Inventory = lazy(() => import("./pages/Inventory"));
+const Production = lazy(() => import("./pages/Production"));
+const Assembly = lazy(() => import("./pages/Assembly"));
+const History = lazy(() => import("./pages/History"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
 
 function App() {
   const navigate = useNavigate();
-  const location = useLocation(); // 👈 used to detect current route
+  const location = useLocation();
   const [user, setUser] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
   // 🔐 Watch Firebase authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      setLoadingAuth(false); // ✅ Done checking
     });
     return () => unsubscribe();
   }, []);
@@ -40,12 +45,19 @@ function App() {
   const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : "";
 
   const hideNavbar = location.pathname === "/login";
-
-  // firestore
-  const [inventory, setInventory] = useState(null);
-
+  // ✅ Show loading until Firebase finishes auth check
+  if (loadingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg">
+          <Loader />
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      <ToastContainer position="top-right" autoClose={3000} />
       {/* Sidebar on md+ screens */}
       {!hideNavbar && (
         <>
@@ -151,71 +163,60 @@ function App() {
 
       {/* Main content area with 5% left/right padding and bottom padding for mobile nav */}
       <main className="flex-1 max-w-6xl mx-auto px-[5%] py-4 pb-16 md:pb-4">
-        <Routes>
-          {/* Login Route */}
-          <Route
-            path="/login"
-            element={<LoginPage onLogin={() => navigate("/")} />}
-          />
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center min-h-screen">
+              <p>Loading page...</p>
+            </div>
+          }
+        >
+          <Routes>
+            {/* Login Route */}
+            <Route
+              path="/login"
+              element={<LoginPage onLogin={() => navigate("/")} />}
+            />
 
-          {/* Protected Routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute user={user}>
-                <Inventory />
-              </ProtectedRoute>
-            }
-          />
-          {/* inventory={inventory}  */}
-          <Route
-            path="/production"
-            element={
-              <ProtectedRoute user={user}>
-                <Production />
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Routes */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute user={user}>
+                  <Inventory />
+                </ProtectedRoute>
+              }
+            />
+            {/* inventory={inventory}  */}
+            <Route
+              path="/production"
+              element={
+                <ProtectedRoute user={user}>
+                  <Production />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/assembly"
-            element={
-              <ProtectedRoute user={user}>
-                <Assembly />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/assembly"
+              element={
+                <ProtectedRoute user={user}>
+                  <Assembly />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/history"
-            element={
-              <ProtectedRoute user={user}>
-                <History />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute user={user}>
+                  <History />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
       </main>
     </div>
-  );
-}
-
-// 🔗 NavLink component
-function NavLink({ to, label }) {
-  const location = useLocation();
-  const isActive = location.pathname === to;
-
-  return (
-    <Link
-      to={to}
-      className={`px-3 py-2 rounded-md transition-colors duration-200 ${
-        isActive
-          ? "bg-blue-600 text-white"
-          : "text-gray-700 hover:bg-blue-100 hover:text-blue-700"
-      }`}
-    >
-      {label}
-    </Link>
   );
 }
 
@@ -428,21 +429,6 @@ function LoginIcon() {
       />
     </svg>
   );
-}
-
-function getPageTitle(pathname) {
-  switch (pathname) {
-    case "/":
-      return "Inventory";
-    case "/production":
-      return "Production";
-    case "/assembly":
-      return "Assembly";
-    case "/history":
-      return "History";
-    default:
-      return "";
-  }
 }
 
 export default App;

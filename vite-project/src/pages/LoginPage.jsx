@@ -1,7 +1,10 @@
-// src/components/LoginPage.js
 import React, { useState } from "react";
 import { auth } from "../firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence, // ✅ use local storage
+} from "firebase/auth";
 
 export default function LoginPage({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -16,14 +19,20 @@ export default function LoginPage({ onLogin }) {
     setLoading(true);
 
     try {
+      // ✅ Persist user login even after refresh / tab close / lock
+      await setPersistence(auth, browserLocalPersistence);
+
+      // ✅ Sign in user
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
         password
       );
+
+      // ✅ Update App state
       onLogin(userCredential.user);
     } catch (err) {
-      // Map Firebase error codes to friendly messages
+      // Map Firebase errors to friendly messages
       switch (err.code) {
         case "auth/invalid-email":
           setError("Invalid email address.");

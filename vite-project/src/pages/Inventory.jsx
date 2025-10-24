@@ -6,7 +6,7 @@ import {
   updateInventory,
 } from "../firebaseService";
 import Loader from "../components/Loader";
-import { ToastContainer, toast } from "react-toastify";
+import { toast } from "react-toastify";
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -430,9 +430,9 @@ const Inventory = () => {
           <table className="min-w-full border border-gray-300 rounded-md mb-6">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-4 py-2 border-b">Product ID</th>
-                <th className="px-4 py-2 border-b">Product Name</th>
-                <th className="px-4 py-2 border-b">Qty / Unit</th>
+                <th className="px-4 py-2 border-b text-left">Product ID</th>
+                <th className="px-4 py-2 border-b text-left">Product Name</th>
+                <th className="px-4 py-2 border-b text-left">Qty / Unit</th>
               </tr>
             </thead>
             <tbody>
@@ -554,13 +554,32 @@ const Inventory = () => {
                         <button
                           className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
                           onClick={async () => {
+                            // Find the current BOM value from inventory
+                            const currentBOM =
+                              (inventory.plateBOM || []).find(
+                                (it) => it.productId === item.productId
+                              )?.qty ?? 0;
+
                             const input = window.prompt(
                               `Enter new BOM qty for ${item.productName} (per unit):`,
-                              item.qty ?? ""
+                              currentBOM
                             );
                             if (input == null) return;
+
                             const val = parseFloat(input);
-                            if (isNaN(val)) return alert("Invalid number");
+
+                            if (isNaN(val)) {
+                              return alert("Invalid number");
+                            }
+
+                            if (val < 0) {
+                              return alert("Negative numbers are not allowed");
+                            }
+
+                            if (val === 0) {
+                              return alert("Zero is not allowed");
+                            }
+
                             setInventory((prev) => {
                               const copy = { ...prev };
                               // find previous BOM entry before mutating
@@ -577,7 +596,7 @@ const Inventory = () => {
                               copy.logs = [
                                 ...(copy.logs || []),
                                 {
-                                  timestamp: new Date().toISOString(),
+                                  timestamp: new Date().toLocaleString(),
                                   action: `Updated BOM qty for ${item.productName} (${item.productId}) from ${prevQty} to ${val}`,
                                 },
                               ];
@@ -604,6 +623,13 @@ const Inventory = () => {
                             if (input == null) return;
                             const val = parseFloat(input);
                             if (isNaN(val)) return alert("Invalid number");
+                            if (val < 0) {
+                              return alert("Negative numbers are not allowed");
+                            }
+
+                            if (val === 0) {
+                              return alert("Zero is not allowed");
+                            }
                             setInventory((prev) => {
                               const copy = { ...prev };
                               copy.l1_component = (copy.l1_component || []).map(
@@ -615,7 +641,7 @@ const Inventory = () => {
                               copy.logs = [
                                 ...(copy.logs || []),
                                 {
-                                  timestamp: new Date().toISOString(),
+                                  timestamp: new Date().toLocaleString(),
                                   action: `Updated Threshold for ${item.productName} from ${item.minThreshold} to ${val}`,
                                 },
                               ];
@@ -748,7 +774,6 @@ const Inventory = () => {
         materials={inventory.l1_component}
         setInventory={setInventory}
       />
-      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

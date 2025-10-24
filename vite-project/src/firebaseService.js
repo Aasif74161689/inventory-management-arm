@@ -39,6 +39,7 @@ export const initInventory = async (data) => {
 };
 
 // Update inventory
+
 export const updateInventory = async (updatedData) => {
   await updateDoc(inventoryDocRef, updatedData);
 };
