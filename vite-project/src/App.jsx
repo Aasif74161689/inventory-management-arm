@@ -17,6 +17,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 const Inventory = lazy(() => import("./pages/Inventory"));
 const Production = lazy(() => import("./pages/Production"));
 const Assembly = lazy(() => import("./pages/Assembly"));
+const Charging = lazy(() => import("./pages/Charging"));
+const Shipment = lazy(() => import("./pages/Shipment"));
 const History = lazy(() => import("./pages/History"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 
@@ -83,6 +85,16 @@ function App() {
                     icon={<AssemblyIcon />}
                   />
                   <SidebarLink
+                    to="/charging"
+                    label="Charging"
+                    icon={<ChargingIcon />}
+                  />
+                  <SidebarLink
+                    to="/shipment"
+                    label="Shipment"
+                    icon={<ShipmentIcon />}
+                  />
+                  <SidebarLink
                     to="/history"
                     label="History"
                     icon={<HistoryIcon />}
@@ -133,6 +145,16 @@ function App() {
                 to="/assembly"
                 icon={<AssemblyIcon />}
                 label="Assembly"
+              />
+              <BottomNavLink
+                to="/charging"
+                icon={<ChargingIcon />}
+                label="Charging"
+              />
+              <BottomNavLink
+                to="/shipment"
+                icon={<ShipmentIcon />}
+                label="Shipment"
               />
               <BottomNavLink
                 to="/history"
@@ -203,6 +225,24 @@ function App() {
               element={
                 <ProtectedRoute user={user}>
                   <Assembly />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/charging"
+              element={
+                <ProtectedRoute user={user}>
+                  <Charging />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/shipment"
+              element={
+                <ProtectedRoute user={user}>
+                  <Shipment />
                 </ProtectedRoute>
               }
             />
@@ -420,6 +460,60 @@ function LoginIcon() {
       />
       <path
         d="M21 19v-2a4 4 0 0 0-4-4H11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChargingIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M18 5h-2l-2-3H10l-2 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 10v6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14 12l-2 2-2-2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShipmentIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3 21l1.5-6H6l1.5 6M21 21h-3l-1.5-6M12 21v-6m0 0L5.5 9h13L12 15m-2-9h4L14 3h-4l-2 3z"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
