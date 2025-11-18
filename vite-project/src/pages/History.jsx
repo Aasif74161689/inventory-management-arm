@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-// plateBOM will be read from inventory.plateBOM (loaded from Firestore)
+import { useNavigate, useParams } from "react-router-dom";
 import { fetchInventory } from "../firebaseService";
 import Loader from "../components/Loader";
 
@@ -8,40 +7,64 @@ const safeNumber = (val) => (isNaN(val) || val == null ? 0 : Number(val));
 
 export default function History() {
   const navigate = useNavigate();
+  const { id } = useParams(); // ✅ define before using it
+
   const [inventory, setInventory] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState("logs"); // default to logs
+  const [selected, setSelected] = useState(id ? "production" : "logs");
   const [productionFilter, setProductionFilter] = useState("all");
+  const [assemblyFilter, setAssemblyFilter] = useState("all");
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
-      const data = await fetchInventory();
-      setInventory(
-        data || { productionOrders: [], assemblyOrders: [], logs: [] }
-      );
-      setLoading(false);
+      try {
+        setLoading(true);
+        const data = await fetchInventory();
+        setInventory(
+          data || { productionOrders: [], assemblyOrders: [], logs: [] }
+        );
+      } catch (err) {
+        console.error("Error fetching inventory:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, []);
+
+  // ✅ Highlight / scroll to the specific order when opened via tooltip
+  useEffect(() => {
+    if (id) {
+      const path = window.location.pathname;
+
+      // ✅ Detect which history type we came from
+      if (path.includes("/assembly/")) {
+        setSelected("assembly");
+      } else {
+        setSelected("production");
+      }
+
+      setTimeout(() => {
+        const el = document.getElementById(`order-${id}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 400);
+    }
+  }, [id, inventory]);
 
   if (loading) return <Loader />;
 
   const computeDiscrepancies = (order) => {
     const discrepancies = [];
-
     if (order.status === "completed") {
       const actualOutput = safeNumber(order.actualOutput);
       const predictedOutput = safeNumber(order.predictedOutput);
 
-      // Check output discrepancy
       if (actualOutput !== predictedOutput) {
         discrepancies.push(
           `Output mismatch: Predicted ${predictedOutput}, Actual ${actualOutput}`
         );
       }
 
-      // Check material usage against actual output
       const expectedMaterials = {};
       const bomSource = inventory?.plateBOM || [];
       bomSource.forEach((bom) => {
@@ -53,7 +76,6 @@ export default function History() {
       Object.entries(order.materialsUsed || {}).forEach(([prodId, usedQty]) => {
         const expected = expectedMaterials[prodId] ?? 0;
         const used = safeNumber(usedQty);
-
         if (used !== expected) {
           const bom = (inventory?.plateBOM || []).find(
             (b) => b.productId === prodId
@@ -65,7 +87,6 @@ export default function History() {
         }
       });
     }
-
     return discrepancies;
   };
 
@@ -80,51 +101,36 @@ export default function History() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/")}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm"
-          >
-            Back
-          </button>
-        </div>
+        <button
+          onClick={() => navigate("/")}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm"
+        >
+          Back
+        </button>
       </div>
+
       {/* Tabs */}
       <div className="mb-6 flex border-b border-gray-200">
-        <button
-          onClick={() => setSelected("production")}
-          className={`px-4 py-2 -mb-px font-medium text-sm border-b-2 ${
-            selected === "production"
-              ? "border-blue-500 text-blue-600"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Production Orders
-        </button>
-
-        <button
-          onClick={() => setSelected("assembly")}
-          className={`px-4 py-2 -mb-px font-medium text-sm border-b-2 ${
-            selected === "assembly"
-              ? "border-green-500 text-green-600"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Assembly Orders
-        </button>
-
-        <button
-          onClick={() => setSelected("logs")}
-          className={`px-4 py-2 -mb-px font-medium text-sm border-b-2 ${
-            selected === "logs"
-              ? "border-gray-500 text-gray-800"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Logs
-        </button>
+        {["production", "assembly", "logs"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setSelected(tab)}
+            className={`px-4 py-2 -mb-px font-medium text-sm border-b-2 ${
+              selected === tab
+                ? tab === "production"
+                  ? "border-blue-500 text-blue-600"
+                  : tab === "assembly"
+                  ? "border-green-500 text-green-600"
+                  : "border-gray-500 text-gray-800"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)} Orders
+          </button>
+        ))}
       </div>
-      {/* Production dropdown */}
+
+      {/* Production filter */}
       {selected === "production" && (
         <div className="mb-4">
           <select
@@ -140,7 +146,7 @@ export default function History() {
         </div>
       )}
 
-      {/* Render production orders with filter applied */}
+      {/* Production Section */}
       {selected === "production" && (
         <section>
           {inventory.productionOrders?.length > 0 ? (
@@ -149,18 +155,10 @@ export default function History() {
                 .filter((order) => {
                   const discrepancies = computeDiscrepancies(order);
                   const status = order.status.toLowerCase();
-
                   if (productionFilter === "all") return true;
-
                   if (productionFilter === "discrepancy")
                     return status === "completed" && discrepancies.length > 0;
-
-                  // Map dropdown value "started" to actual status
-                  const filterStatus =
-                    productionFilter === "started"
-                      ? "started"
-                      : productionFilter;
-                  return status === filterStatus;
+                  return status === productionFilter;
                 })
                 .map((order) => {
                   const discrepancies = computeDiscrepancies(order);
@@ -173,6 +171,7 @@ export default function History() {
                   return (
                     <li
                       key={order.id}
+                      id={`order-${order.id}`}
                       className={`shadow-sm rounded p-4 border ${cardClass}`}
                     >
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
@@ -239,143 +238,245 @@ export default function History() {
         </section>
       )}
 
+      {/* Assembly Filter */}
+      {selected === "assembly" && (
+        <div className="mb-4">
+          <select
+            value={assemblyFilter}
+            onChange={(e) => setAssemblyFilter(e.target.value)}
+            className="border rounded px-3 py-2"
+          >
+            <option value="all">All Assembly Orders</option>
+            <option value="started">Started</option>
+            <option value="completed">Completed</option>
+            <option value="discrepancy">Completed (Discrepancy)</option>
+          </select>
+        </div>
+      )}
+
+      {/* Assembly Section */}
       {selected === "assembly" && (
         <section>
           {inventory.assemblyOrders?.length > 0 ? (
             <ul className="space-y-4">
-              {inventory.assemblyOrders.map((a) => {
-                const discrepancies = [];
+              {inventory.assemblyOrders
+                .filter((a) => {
+                  const discrepancies = [];
 
-                // Only check discrepancies if status is completed
-                if (a.status === "completed") {
-                  const actualOutput = safeNumber(a.actualOutput);
-                  const expectedOutput = safeNumber(
-                    a.predictedOutput ?? a.units ?? 0
-                  );
+                  if (a.status === "completed") {
+                    const actualOutput = safeNumber(a.actualOutput);
+                    const expectedOutput = safeNumber(
+                      a.predictedOutput ?? a.units ?? 0
+                    );
 
-                  // Check output discrepancy
-                  if (actualOutput !== expectedOutput) {
-                    discrepancies.push(
-                      `Output mismatch: Expected ${expectedOutput}, Actual ${actualOutput}`
+                    if (actualOutput !== expectedOutput) {
+                      discrepancies.push(`Output mismatch`);
+                    }
+
+                    Object.entries(a.materialsUsed || {}).forEach(
+                      ([mat, usedQty]) => {
+                        const bomItem = inventory.inverterBOM?.find(
+                          (item) =>
+                            item.productId.toLowerCase() ===
+                              mat.toLowerCase() ||
+                            item.name.toLowerCase() === mat.toLowerCase()
+                        );
+                        const expectedQty = bomItem
+                          ? bomItem.qty * (a.predictedOutput ?? a.units ?? 0)
+                          : null;
+
+                        if (!usedQty || usedQty === 0) {
+                          discrepancies.push(`${mat} is missing or 0`);
+                        } else if (
+                          expectedQty !== null &&
+                          Number(usedQty) !== Number(expectedQty)
+                        ) {
+                          discrepancies.push(
+                            `${mat}: used ${usedQty}, expected ${expectedQty} (for ${
+                              a.predictedOutput ?? a.units ?? 0
+                            } units)`
+                          );
+                        }
+                      }
                     );
                   }
 
-                  // Check for missing/0 materials
-                  Object.entries(a.materialsUsed || {}).forEach(
-                    ([mat, qty]) => {
-                      if (!qty || qty === 0)
-                        discrepancies.push(`${mat} is missing or 0`);
+                  const status = a.status.toLowerCase();
+                  if (assemblyFilter === "all") return true;
+                  if (assemblyFilter === "discrepancy")
+                    return status === "completed" && discrepancies.length > 0;
+                  return status === assemblyFilter;
+                })
+                .map((a) => {
+                  const discrepancies = [];
+
+                  if (a.status === "completed") {
+                    const actualOutput = safeNumber(a.actualOutput);
+                    const expectedOutput = safeNumber(
+                      a.predictedOutput ?? a.units ?? 0
+                    );
+
+                    if (actualOutput !== expectedOutput) {
+                      discrepancies.push(
+                        `Output mismatch: Expected ${expectedOutput}, Actual ${actualOutput}`
+                      );
                     }
-                  );
-                }
 
-                // Card background logic
-                const cardClass =
-                  a.status === "completed" && discrepancies.length === 0
-                    ? "bg-green-50 border-green-300"
-                    : discrepancies.length > 0
-                    ? "bg-red-50 border-red-300"
-                    : "bg-white border-gray-200";
+                    Object.entries(a.materialsUsed || {}).forEach(
+                      ([mat, usedQty]) => {
+                        const bomItem = inventory.inverterBOM?.find(
+                          (item) =>
+                            item.productId.toLowerCase() ===
+                              mat.toLowerCase() ||
+                            item.name.toLowerCase() === mat.toLowerCase()
+                        );
 
-                return (
-                  <li
-                    key={a.id}
-                    className={`shadow-sm rounded p-4 border ${cardClass}`}
-                  >
-                    <div className="flex justify-between">
-                      <div>
-                        <p className="font-medium text-gray-800">
-                          Assembly #{a.id} —{" "}
-                          <span className="capitalize">{a.status}</span>
-                        </p>
-                        <p className="text-sm text-gray-600">{a.timestamp}</p>
+                        const displayName =
+                          bomItem?.name || bomItem?.productName || mat;
+                        const expectedQty = bomItem
+                          ? bomItem.qty * (a.predictedOutput ?? a.units ?? 0)
+                          : null;
+
+                        if (!usedQty || usedQty === 0) {
+                          discrepancies.push(`${displayName} is missing or 0`);
+                        } else if (
+                          expectedQty !== null &&
+                          Number(usedQty) !== Number(expectedQty)
+                        ) {
+                          discrepancies.push(
+                            `${displayName}: used ${usedQty}, expected ${expectedQty} (for ${
+                              a.predictedOutput ?? a.units ?? 0
+                            } units)`
+                          );
+                        }
+                      }
+                    );
+                  }
+
+                  const cardClass =
+                    a.status === "completed" && discrepancies.length === 0
+                      ? "bg-green-50 border-green-300"
+                      : discrepancies.length > 0
+                      ? "bg-red-50 border-red-300"
+                      : "bg-white border-gray-200";
+
+                  return (
+                    <li
+                      key={a.id}
+                      id={`order-${a.id}`}
+                      className={`shadow-sm rounded p-4 border ${cardClass}`}
+                    >
+                      <div className="flex justify-between">
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            Order #{a.id} —{" "}
+                            <span className="capitalize">{a.status}</span>
+                          </p>
+                          <p className="text-sm text-gray-600">{a.timestamp}</p>
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          Predicted:{" "}
+                          <strong>{a.predictedOutput ?? a.units ?? "-"}</strong>
+                          <br />
+                          Actual: <strong>{a.actualOutput ?? "-"}</strong>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-700">
-                        Predicted:{" "}
-                        <strong>{a.predictedOutput ?? a.units ?? "-"}</strong>
-                        <br />
-                        Actual: <strong>{a.actualOutput ?? "-"}</strong>
-                      </div>
-                    </div>
 
-                    <div className="mt-3 text-sm">
-                      <p className="font-semibold mb-1">Materials Used</p>
-                      <ul className="list-disc ml-5">
-                        {Object.entries(a.materialsUsed || {}).map(
-                          ([mat, qty]) => (
-                            <li key={mat} className="capitalize">
-                              {mat}: {qty ?? "-"}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    </div>
+                      <div className="mt-3 text-sm text-gray-700">
+                        <p className="font-semibold mb-1">Materials Used</p>
+                        <ul className="list-disc ml-5">
+                          {Object.entries(a.materialsUsed || {}).map(
+                            ([mat, qty]) => {
+                              const bomItem = inventory.inverterBOM?.find(
+                                (item) =>
+                                  item.productId.toLowerCase() ===
+                                    mat.toLowerCase() ||
+                                  item.name.toLowerCase() === mat.toLowerCase()
+                              );
 
-                    {discrepancies.length > 0 && (
-                      <div className="mt-3 border border-red-300 bg-red-50 text-red-800 p-3 rounded">
-                        <strong className="block mb-1">
-                          ⚠️ Discrepancy Report
-                        </strong>
-                        <ul className="list-disc ml-5 text-sm">
-                          {discrepancies.map((d, i) => (
-                            <li key={i}>{d}</li>
-                          ))}
+                              const displayName =
+                                bomItem?.name || bomItem?.productName || mat;
+
+                              return (
+                                <li key={mat} className="capitalize">
+                                  {displayName}: {safeNumber(qty)}
+                                </li>
+                              );
+                            }
+                          )}
                         </ul>
                       </div>
-                    )}
-                  </li>
-                );
-              })}
+
+                      {discrepancies.length > 0 && (
+                        <div className="mt-3 border border-red-300 bg-red-50 text-red-800 p-3 rounded shadow-sm">
+                          <strong className="block mb-1">
+                            ⚠️ Discrepancy Report
+                          </strong>
+                          <ul className="list-disc ml-5 text-sm">
+                            {discrepancies.map((d, i) => (
+                              <li key={i}>{d}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
             </ul>
           ) : (
-            <p>No assembly orders yet.</p>
+            <p className="text-gray-500 italic">No assembly orders yet.</p>
           )}
         </section>
       )}
+
+      {/* Logs Section */}
       {selected === "logs" && (
         <section>
           {(inventory.logs || []).length > 0 ? (
             <ul className="space-y-3">
-              {inventory.logs.map((log, i) => {
-                const isDiscrepancy =
-                  (log.action && log.action.includes("⚠️")) ||
-                  log.logType === "discrepency" ||
-                  log.logType === "discrepancy";
-
-                return (
-                  <li
-                    key={i}
-                    className={`border rounded p-3 ${
-                      isDiscrepancy
-                        ? "bg-red-50 border-red-300 text-red-800"
-                        : "bg-white"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm text-gray-500">{log.timestamp}</p>
-                        <div className="mt-1 text-base whitespace-pre-wrap">
-                          {isDiscrepancy ? (
-                            <>
-                              <strong className="block mb-1">
-                                ⚠️ Discrepancy
-                              </strong>
-                              {log.action?.replace("⚠️ ", "")}
-                            </>
-                          ) : (
-                            log.action
+              {inventory.logs
+                .slice()
+                .reverse()
+                .map((log, i) => {
+                  const isDiscrepancy =
+                    (log.action && log.action.includes("⚠️")) ||
+                    log.logType === "discrepancy";
+                  return (
+                    <li
+                      key={log.id ?? i}
+                      className={`border rounded p-3 ${
+                        isDiscrepancy
+                          ? "bg-red-50 border-red-300 text-red-800"
+                          : "bg-white"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm text-gray-500">
+                            {log.timestamp}
+                          </p>
+                          <div className="mt-1 text-base whitespace-pre-wrap">
+                            {isDiscrepancy ? (
+                              <>
+                                <strong className="block mb-1">
+                                  ⚠️ Discrepancy
+                                </strong>
+                                {log.action?.replace("⚠️ ", "")}
+                              </>
+                            ) : (
+                              log.action
+                            )}
+                          </div>
+                          {log.remarks && (
+                            <div className="text-sm text-gray-600 mt-2">
+                              {log.remarks}
+                            </div>
                           )}
                         </div>
-                        {log.remarks && (
-                          <div className="text-sm text-gray-600 mt-2">
-                            {log.remarks}
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  </li>
-                );
-              })}
+                    </li>
+                  );
+                })}
             </ul>
           ) : (
             <p className="text-gray-500 italic">No logs available.</p>

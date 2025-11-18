@@ -11,28 +11,6 @@ export const fetchInventory = async () => {
   return snap.data();
 };
 
-export const resetInventory = async () => {
-  try {
-    const collections = [
-      "inventory",
-      "productionOrders",
-      "assemblyOrders",
-      "logs",
-    ];
-    for (const collName of collections) {
-      const querySnapshot = await getDocs(collection(db, collName));
-      const deletePromises = querySnapshot.docs.map((d) =>
-        deleteDoc(doc(db, collName, d.id))
-      );
-      await Promise.all(deletePromises);
-    }
-    return true;
-  } catch (error) {
-    console.error("Error resetting inventory:", error);
-    return false;
-  }
-};
-
 // Initialize inventory (if not exists)
 export const initInventory = async (data) => {
   await setDoc(inventoryDocRef, data);

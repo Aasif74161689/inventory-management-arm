@@ -1,19 +1,16 @@
-// ...existing code...
+// BulkL2UpdateModal.jsx
 import React, { useState, useEffect } from "react";
 import { updateInventory } from "../firebaseService";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
+const BulkL2UpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   const [stockData, setStockData] = useState([]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [remarks, setRemarks] = useState("");
 
   useEffect(() => {
     if (isOpen && materials) {
-      // support two shapes:
-      // 1) materials is an array of product objects (preferred)
-      // 2) materials is a map object { name: qty }
       let items = [];
       if (Array.isArray(materials)) {
         items = materials.map((m) => ({
@@ -21,7 +18,7 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
           productName: m.productName || m.name || m.productId,
           qty: 0,
           available: m.quantity ?? m.qty ?? 0,
-          unit: m.unit || "KG",
+          unit: m.unit || "PCS",
         }));
       } else if (typeof materials === "object") {
         items = Object.entries(materials || {}).map(([name, qty]) => ({
@@ -29,7 +26,7 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
           productName: name,
           qty: 0,
           available: qty,
-          unit: "KG",
+          unit: "PCS",
         }));
       }
       setStockData(items);
@@ -46,24 +43,18 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
 
   const handleChange = (index, value) => {
     const updated = [...stockData];
-    // allow decimals
     updated[index].qty = value === "" ? 0 : Number(value);
     setStockData(updated);
   };
 
-  // Preview modal before saving
-  const handlePreview = () => {
-    setShowConfirm(true);
-  };
+  const handlePreview = () => setShowConfirm(true);
 
   const handleConfirmSave = async () => {
     if (!materials) return;
 
-    // Build updated l1_component array from stockData
     const changes = [];
     let hasReduction = false;
 
-    // We'll start from materials if it's an array, else try to read previous inventory via setInventory
     const baseArray = Array.isArray(materials)
       ? materials.map((m) => ({ ...m }))
       : [];
@@ -84,7 +75,6 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
           );
         }
 
-        // Update or add in baseArray
         const idx = baseArray.findIndex(
           (it) => it.productId === productId || it.productName === productName
         );
@@ -101,20 +91,19 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
       const newLog = {
         timestamp,
         action: hasReduction
-          ? `⚠️ Discrepancy in Production stock update:\n${changes.join("\n")}`
-          : `🔧 Production stock update:\n${changes.join("\n")}`,
-        ...(hasReduction && { logType: "discrepency" }),
+          ? `⚠️ Discrepancy in Assembly stock update:\n${changes.join("\n")}`
+          : `🔧 Assembly stock update:\n${changes.join("\n")}`,
+        ...(hasReduction && { logType: "discrepancy" }),
         ...(remarks && { remarks }),
       };
 
-      // Build updatedInventory: try to merge with previous inventory via setInventory(prev => ...)
-      let updatedInventory = { l1_component: baseArray, logs: [newLog] };
+      let updatedInventory = { l2_component: baseArray, logs: [newLog] };
 
       setInventory((prev) => {
         if (prev && typeof prev === "object") {
           const merged = {
             ...prev,
-            l1_component: baseArray,
+            l2_component: baseArray,
             logs: [...(prev.logs || []), newLog],
           };
           updatedInventory = merged;
@@ -125,11 +114,11 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
 
       try {
         await updateInventory(updatedInventory);
-        toast.success("Inventory updated successfully");
-        console.log("✅ Firebase inventory updated");
+        toast.success("L2 stock updated successfully");
+        console.log("✅ Firebase L2 inventory updated");
       } catch (err) {
         console.error("❌ Firebase update failed:", err);
-        toast.error("Failed to update inventory");
+        toast.error("Failed to update L2 inventory");
       }
     }
 
@@ -137,7 +126,6 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
     onClose();
   };
 
-  // Prepare preview data
   const previewChanges = stockData
     .filter(({ qty }) => qty !== 0)
     .map(({ productId, productName, qty, available, unit }) => {
@@ -158,7 +146,7 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 px-4 sm:px-0">
       <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-[700px] max-h-[85vh] shadow-lg overflow-y-auto">
         <h3 className="text-lg sm:text-xl font-bold mb-4 text-center gap-2 flex justify-between items-center">
-          🔧 Update Stock
+          🔧 Update L2 Stock
           <button className="text-red-600" onClick={onClose}>
             X
           </button>
@@ -167,7 +155,7 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
         {showConfirm ? (
           <div>
             <h4 className="text-base sm:text-lg font-semibold mb-3 text-center sm:text-left">
-              Confirm Changes
+              Confirm L2 Changes
             </h4>
 
             {previewChanges.length > 0 ? (
@@ -231,11 +219,11 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
               </div>
             ) : (
               <p className="text-gray-500 text-center sm:text-left">
-                No changes detected.
+                No L2 changes detected.
               </p>
             )}
 
-            {/* Remarks input */}
+            {/* Remarks */}
             <div className="mt-4">
               <label
                 className="block text-sm font-medium mb-1"
@@ -271,142 +259,82 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
           </div>
         ) : (
           <>
-            {/* {stockData.length > 0 ? (
+            {stockData.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-12">
                 {[
                   stockData.slice(0, Math.ceil(stockData.length / 2)),
                   stockData.slice(Math.ceil(stockData.length / 2)),
                 ].map((half, idx) => (
                   <div key={idx} className="space-y-3">
-                    {half.map((item) => (
-                      <div
-                        key={item.productId || item.productName}
-                        className="flex justify-between items-center"
-                      >
-                        <span className="capitalize text-sm sm:text-base">
-                          {item.productName} ({item.unit})
-                        </span>
-                        <input
-                          type={
-                            item.productName.toLowerCase().includes("bag") ||
-                            item.productName.toLowerCase().includes("bottom")
-                              ? "text"
-                              : "number"
-                          }
-                          inputMode="numeric"
-                          pattern={
-                            item.productName.toLowerCase().includes("bag") ||
-                            item.productName.toLowerCase().includes("bottom")
-                              ? "[0-9]*"
-                              : "[0-9]*[.,]?[0-9]*"
-                          }
-                          placeholder={String(item.available)}
-                          value={item.qty === 0 ? "" : item.qty}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const isBagOrBottom =
-                              item.productName.toLowerCase().includes("bag") ||
-                              item.productName.toLowerCase().includes("bottom");
+                    {half.map((item) => {
+                      const name = item.productName?.toLowerCase() || "";
 
-                            // Allow only digits (no decimals or negatives) for bag/bottom
-                            if (isBagOrBottom) {
-                              if (!/^\d*$/.test(val)) return;
-                            } else {
-                              // For other numeric fields
-                              // Allow negatives, decimals, but limit to available
+                      // Materials where only whole numbers (no decimals) are allowed
+                      const absoluteItems = [
+                        "positive plate",
+                        "negative plate",
+                        "separator",
+                        "container set",
+                        "thermocol",
+                        "indicator",
+                        "nutt bolt",
+                        "gelly pouch",
+                        "terminal cover",
+                        "polythene",
+                        "sticker",
+                        "box",
+                        "warranty card",
+                      ];
+
+                      const isAbsolute = absoluteItems.some((m) =>
+                        name.includes(m)
+                      );
+
+                      return (
+                        <div
+                          key={item.productId || item.productName}
+                          className="flex justify-between items-center"
+                        >
+                          <span className="capitalize text-sm sm:text-base">
+                            {item.productName} ({item.unit})
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            placeholder={String(item.available)}
+                            value={item.qty === 0 ? "" : item.qty}
+                            onChange={(e) => {
+                              const val = e.target.value;
+
+                              if (val === "") {
+                                handleChange(stockData.indexOf(item), "");
+                                return;
+                              }
+
                               const num = Number(val);
+                              if (isNaN(num)) return;
 
-                              // Block invalid input (non-numeric but allow empty)
-                              if (val !== "" && isNaN(num)) return;
+                              if (isAbsolute) {
+                                // Allow only integers (no decimals)
+                                if (!/^-?\d+$/.test(val)) return;
+                              }
 
-                              // Restrict: negative allowed but not less than -available
+                              // Restrict: negative not less than -available
                               if (num < -item.available) return;
 
-                              // Restrict: positive not more than available
-                              if (num > item.available) return;
-                            }
-
-                            handleChange(stockData.indexOf(item), val);
-                          }}
-                          className="border px-2 py-1 rounded w-20 sm:w-28 text-right text-sm sm:text-base"
-                        />
-                      </div>
-                    ))}
+                              handleChange(stockData.indexOf(item), val);
+                            }}
+                            className="border px-2 py-1 rounded w-20 sm:w-28 text-right text-sm sm:text-base"
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-gray-500 text-center py-6 text-sm sm:text-base">
-                ⚠️ No inventory data found.
-              </p>
-            )} */}
-
-            {stockData.length > 0 ? (
-              <div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-12">
-                  {[
-                    stockData.slice(0, Math.ceil(stockData.length / 2)),
-                    stockData.slice(Math.ceil(stockData.length / 2)),
-                  ].map((half, idx) => (
-                    <div key={idx} className="space-y-3">
-                      {half.map((item) => {
-                        const name = item.productName?.toLowerCase() || "";
-
-                        // Items where only whole numbers (no decimals) are allowed
-                        const absoluteItems = ["bag", "bottom"];
-
-                        const isAbsolute = absoluteItems.some((m) =>
-                          name.includes(m)
-                        );
-
-                        return (
-                          <div
-                            key={item.productId || item.productName}
-                            className="flex justify-between items-center"
-                          >
-                            <span className="capitalize text-sm sm:text-base">
-                              {item.productName} ({item.unit})
-                            </span>
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              placeholder={String(item.available)}
-                              value={item.qty === 0 ? "" : item.qty}
-                              onChange={(e) => {
-                                const val = e.target.value;
-
-                                // Empty allowed (for clearing input)
-                                if (val === "") {
-                                  handleChange(stockData.indexOf(item), "");
-                                  return;
-                                }
-
-                                const num = Number(val);
-                                if (isNaN(num)) return;
-
-                                // Allow only integers for absolute items (like bag, bottom, etc.)
-                                if (isAbsolute && !/^-?\d+$/.test(val)) return;
-
-                                // Restrict: negative not less than -available
-                                if (num < -item.available) return;
-
-                                // // Restrict: positive not more than available
-                                // if (num > item.available) return;
-
-                                handleChange(stockData.indexOf(item), val);
-                              }}
-                              className="border px-2 py-1 rounded w-20 sm:w-28 text-right text-sm sm:text-base"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-gray-500 text-center py-6 text-sm sm:text-base">
-                ⚠️ No inventory data found.
+                ⚠️ No L2 inventory data found.
               </p>
             )}
 
@@ -432,4 +360,4 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
   );
 };
 
-export default BulkStockUpdateModal;
+export default BulkL2UpdateModal;

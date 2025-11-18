@@ -48,10 +48,12 @@ function App() {
   // ✅ Show loading until Firebase finishes auth check
   if (loadingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg">
-          <Loader />
-        </p>
+      <div className="text-lg">
+        <Loader>
+          <div className="fixed inset-0 ...">
+            <div className="w-12 h-12 border-4 border-[#2563eb] border-t-transparent rounded-full animate-spin" />
+          </div>
+        </Loader>
       </div>
     );
   }
@@ -205,14 +207,10 @@ function App() {
               }
             />
 
-            <Route
-              path="/history"
-              element={
-                <ProtectedRoute user={user}>
-                  <History />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/history" element={<History />} />
+
+            <Route path="/production/history/:id?" element={<History />} />
+            <Route path="/assembly/history/:id" element={<History />} />
           </Routes>
         </Suspense>
       </main>

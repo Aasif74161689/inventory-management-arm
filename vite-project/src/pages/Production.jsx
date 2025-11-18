@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { fetchInventory, updateInventory } from "../firebaseService";
+import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import { toast } from "react-toastify";
 
@@ -9,7 +10,8 @@ const Production = () => {
   const [predictedOutput, setPredictedOutput] = useState(0);
   const [requiredOutput, setRequiredOutput] = useState("");
   const [actualOutputs, setActualOutputs] = useState({});
-  const [openDetails, setOpenDetails] = useState(null);
+  // const [openDetails, setOpenDetails] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
@@ -49,7 +51,7 @@ const Production = () => {
     }
   }, [effectiveBOM, materialsInput]);
 
-  const handleChange = (e, productId, productName) => {
+  const handleChange = (e, productId) => {
     const value = e.target.value;
 
     // allow clearing the field
@@ -167,7 +169,7 @@ const Production = () => {
           (l1Map[bom.productId]?.quantity || 0) <
           (materialsInput[bom.productId] || 0)
       )
-      .map((bom) => bom.productName);
+      .map((bom) => bom.name);
 
     if (insufficient.length > 0) {
       updatedLogs.push({
@@ -184,7 +186,7 @@ const Production = () => {
       alert(
         `Not enough stock for: ${insufficient
           .map((name) => {
-            const bom = effectiveBOM.find((b) => b.productName === name);
+            const bom = effectiveBOM.find((b) => b.name === name);
             const prodId = bom.productId;
             return `${name} (needed: ${materialsInput[prodId]}, available: ${
               l1Map[prodId]?.quantity || 0
@@ -234,23 +236,22 @@ const Production = () => {
     setRequiredOutput("");
   };
 
-  const handleActualOutputChange = (orderId, value) => {
+  const handleActualOutputChange = (orderId, value, predicted) => {
+    // Allow only digits (no negative, no decimal)
+    if (!/^\d*$/.test(value)) return;
+
+    const num = parseInt(value, 10);
+
+    // Block if number exceeds predicted
+    if (!isNaN(num) && num > predicted) return;
+
     setActualOutputs({
       ...actualOutputs,
-      [orderId]: parseFloat(value) || "",
+      [orderId]: value,
     });
   };
 
   const handleCompleteProduction = async (orderId) => {
-    try {
-      await updateInventory(updatedInventory);
-      toast.success("✅ Production done successfully");
-      console.log("✅ Firebase inventory updated");
-    } catch (err) {
-      console.error("❌ Firebase update failed:", err);
-      toast.error("❌ Production not done");
-    }
-
     if (!inventory) return;
 
     const actual = actualOutputs[orderId] || 0;
@@ -278,9 +279,12 @@ const Production = () => {
     let discrepancyMessages = [];
 
     // Compare predicted vs actual output
-    if (completedOrder && actual !== completedOrder.predictedOutput) {
+    const predicted = Number(completedOrder?.predictedOutput);
+    const actualVal = Number(actual);
+
+    if (!isNaN(predicted) && !isNaN(actualVal) && predicted !== actualVal) {
       discrepancyMessages.push(
-        `Output mismatch: Predicted ${completedOrder.predictedOutput}, Actual ${actual}`
+        `Output mismatch: Predicted ${predicted}, Actual ${actualVal}`
       );
     }
 
@@ -304,14 +308,42 @@ const Production = () => {
       }
     );
 
+    // if (discrepancyMessages.length > 0) {
+    //   newLogs.push({
+    //     timestamp,
+    //     logType: "discrepancy",
+    //     action: `⚠️ Discrepancy in Production #${orderId} - ${discrepancyMessages.join(
+    //       "; "
+    //     )}`,
+    //   });
+    //   completedOrder.discrepancyMessages = discrepancyMessages;
+    // } else {
+    //   // ✅ no log for clean orders
+    //   completedOrder.discrepancyMessages = [];
+    // }
+
     if (discrepancyMessages.length > 0) {
+      // Replace PD-XXX with actual name from effectiveBOM or l1_component
+      const formattedDiscrepancies = discrepancyMessages.map((msg) => {
+        return msg.replace(/(PD-\d{3})/g, (id) => {
+          const bomItem =
+            effectiveBOM.find((b) => b.productId === id) ||
+            inventory.l1_component?.find((i) => i.productId === id);
+          return bomItem?.name || bomItem?.productName || id;
+        });
+      });
+
       newLogs.push({
         timestamp,
-        logType: "discrepency",
-        action: `⚠️ Discrepancy in Order #${orderId} - ${discrepancyMessages.join(
+        logType: "discrepancy",
+        action: `⚠️ Discrepancy in Production #${orderId} - ${formattedDiscrepancies.join(
           "; "
         )}`,
       });
+
+      completedOrder.discrepancyMessages = formattedDiscrepancies;
+    } else {
+      completedOrder.discrepancyMessages = [];
     }
 
     const updatedInventory = {
@@ -334,322 +366,410 @@ const Production = () => {
   if (!inventory) return <Loader />;
 
   return (
-    <main className="flex-1 max-w-6x1 mx-auto px-[5%] py-4 pb-16 md:pb-4">
-      <div className="w-full max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden">
-        <h2 className="text-3xl font-bold text-center mb-6">
-          Plate Production
-        </h2>
+    // <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-4 pb-16 md:pb-4">
+    <div className="w-full max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden">
+      <h2 className="text-3xl font-bold text-center mb-6">Plate Production</h2>
 
-        {/* --- BOM Section --- */}
-        <div className="border border-gray-300 rounded-md p-6 mb-8 bg-gray-50 w-full">
-          <h3 className="text-xl font-semibold mb-6 text-center">
-            🧾 BOM for 1 Plate
-          </h3>
+      {/* --- BOM Section --- */}
+      <div className="border border-gray-300 rounded-md p-4 sm:p-6 mb-8 bg-gray-50 w-full">
+        <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-center">
+          🧾 BOM for 1 Plate
+        </h3>
 
-          <div className="flex flex-col sm:flex-row gap-6 w-full">
-            {/* Split array into two halves */}
-            {[
-              effectiveBOM.slice(0, Math.ceil(effectiveBOM.length / 2)),
-              effectiveBOM.slice(Math.ceil(effectiveBOM.length / 2)),
-            ].map((half, idx) => (
-              <ul
-                key={idx}
-                className="list-none space-y-2 text-gray-700 capitalize flex-1"
-              >
-                {half.map((bom) => (
-                  <li key={bom.productId} className="text-sm sm:text-base">
-                    <span className="font-medium">{bom.name}</span>: {bom.qty} (
-                    Stock: {l1Map[bom.productId]?.quantity || 0}{" "}
-                    {l1Map[bom.productId]?.unit || ""})
-                  </li>
-                ))}
-              </ul>
-            ))}
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-6 w-full">
+          {/* Split array into two halves */}
+          {[
+            effectiveBOM.slice(0, Math.ceil(effectiveBOM.length / 2)),
+            effectiveBOM.slice(Math.ceil(effectiveBOM.length / 2)),
+          ].map((half, idx) => (
+            <ul
+              key={idx}
+              className="list-none space-y-2 text-gray-700 capitalize flex-1"
+            >
+              {half.map((bom) => (
+                <li key={bom.productId} className="text-sm sm:text-base">
+                  <span className="font-medium">{bom.name}</span>: {bom.qty} (
+                  Stock: {l1Map[bom.productId]?.quantity || 0}{" "}
+                  {l1Map[bom.productId]?.unit || ""})
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      </div>
+
+      {/* --- Form Section --- */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+          <label htmlFor="requiredOutput" className="font-medium">
+            Required Output:
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              id="requiredOutput"
+              type="text"
+              min="1"
+              value={requiredOutput}
+              onChange={handleRequiredOutputChange}
+              className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-24 sm:w-32"
+              placeholder="Number"
+            />
+            <span className="text-gray-500 text-sm">
+              (Autofills material quantities)
+            </span>
           </div>
         </div>
 
-        {/* --- Form Section --- */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
-            <label htmlFor="requiredOutput" className="font-medium">
-              Required Output:
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="requiredOutput"
-                type="number"
-                min="1"
-                value={requiredOutput}
-                onChange={handleRequiredOutputChange}
-                className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-24 sm:w-32"
-                placeholder="Number"
-              />
-              <span className="text-gray-500 text-sm">
-                (Autofills material quantities)
-              </span>
-            </div>
-          </div>
+        {/* --- Material Inputs Grid --- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {effectiveBOM.map((bom) => {
+            // ✅ Check if the item should allow only integers
+            const isIntegerOnly =
+              bom.name.toLowerCase().includes("bag") ||
+              bom.name.toLowerCase().includes("bottom");
 
-          {/* --- Material Inputs Grid --- */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {effectiveBOM.map((bom) => {
-              // ✅ Check if the item should allow only integers
-              const isIntegerOnly =
-                bom.name.toLowerCase().includes("bag") ||
-                bom.name.toLowerCase().includes("bottom");
+            return (
+              <div key={bom.productId} className="flex flex-col">
+                <label
+                  htmlFor={bom.productId}
+                  className="mb-1 font-medium capitalize text-sm sm:text-base"
+                >
+                  {bom.name} ({l1Map[bom.productId]?.unit || ""}):
+                </label>
+                <input
+                  id={bom.productId}
+                  name={bom.productId}
+                  type="number"
+                  min="0"
+                  step={isIntegerOnly ? "1" : "any"} // ✅ integer-only restriction
+                  value={
+                    materialsInput[bom.productId] === 0
+                      ? 0
+                      : materialsInput[bom.productId] || ""
+                  }
+                  onChange={(e) => {
+                    let value = e.target.value;
 
-              return (
-                <div key={bom.productId} className="flex flex-col">
-                  <label
-                    htmlFor={bom.productId}
-                    className="mb-1 font-medium capitalize text-sm sm:text-base"
-                  >
-                    {bom.name} ({l1Map[bom.productId]?.unit || ""}):
-                  </label>
-                  <input
-                    id={bom.productId}
-                    name={bom.productId}
-                    type="number"
-                    min="0"
-                    step={isIntegerOnly ? "1" : "any"} // ✅ integer-only restriction
-                    value={
-                      materialsInput[bom.productId] === 0
-                        ? 0
-                        : materialsInput[bom.productId] || ""
-                    }
-                    onChange={(e) => {
-                      let value = e.target.value;
-
-                      // ✅ Prevent decimals for bags and bottom
-                      if (isIntegerOnly && value.includes(".")) {
-                        alert(
-                          `${bom.name} must be a whole number (no decimals allowed).`
-                        );
-                        return;
-                      }
-
-                      handleChange(e, bom.productId, bom.productName);
-                    }}
-                    className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* --- Predicted Output --- */}
-          <p className="text-lg font-semibold">
-            🔍 Predicted Output: {predictedOutput} battery
-            {predictedOutput !== 1 ? "s" : ""}
-            <span className="ml-2 text-gray-500 text-sm">
-              (Max possible:{" "}
-              {(() => {
-                if (!inventory?.l1_component) return 0;
-                return Math.min(
-                  ...effectiveBOM.map((bom) => {
-                    const available = l1Map[bom.productId]?.quantity || 0;
-                    if (bom.qty === 0) return Infinity;
-                    return Math.floor(available / bom.qty);
-                  })
-                );
-              })()}
-              )
-            </span>
-          </p>
-
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50 w-full sm:w-auto"
-          >
-            Start Production
-          </button>
-        </form>
-
-        {/* --- Production Orders Section --- */}
-        <section>
-          <h3 className="text-xl font-semibold mt-10 mb-4">
-            🛠️ Production Orders
-          </h3>
-          {inventory.productionOrders?.length > 0 ? (
-            <div className="overflow-x-auto w-full">
-              <table className="min-w-full bg-white border border-gray-200 rounded text-sm sm:text-base">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="text-left px-4 py-2">Order No</th>
-                    <th className="text-left px-4 py-2">Status</th>
-                    <th className="text-left px-4 py-2">Date</th>
-                    <th className="text-left px-4 py-2">
-                      Output (Predicted / Actual)
-                    </th>
-                    <th className="text-left px-4 py-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inventory.productionOrders
-                    .slice()
-                    .reverse()
-                    .map((order) => {
-                      const discrepancy = inventory.logs?.find(
-                        (log) =>
-                          log.action.includes("⚠️") &&
-                          log.action.includes(`Order #${order.id}`)
+                    // ✅ Prevent decimals for bags and bottom
+                    if (isIntegerOnly && value.includes(".")) {
+                      alert(
+                        `${bom.name} must be a whole number (no decimals allowed).`
                       );
+                      return;
+                    }
 
-                      const statusLabel =
-                        order.status === "started"
-                          ? "In Progress"
-                          : "Completed";
-                      const actualValRaw =
-                        order.actualOutput ?? actualOutputs[order.id] ?? null;
-                      const actualVal =
-                        actualValRaw === "" ? null : actualValRaw;
-                      const predNum = Number(order.predictedOutput) || 0;
-                      const actNum =
-                        actualVal != null ? Number(actualVal) || 0 : null;
+                    handleChange(e, bom.productId, bom.productName);
+                  }}
+                  className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                />
+              </div>
+            );
+          })}
+        </div>
 
-                      let outputClass = "text-gray-700";
-                      if (actNum != null) {
-                        if (predNum > actNum)
-                          outputClass = "text-red-600 font-semibold";
-                        else if (predNum === actNum)
-                          outputClass = "text-green-600 font-semibold";
-                      }
+        {/* --- Predicted Output --- */}
+        <p className="text-lg font-semibold">
+          🔍 Predicted Output: {predictedOutput} Plate
+          {predictedOutput !== 1 ? "s" : ""}
+          <span className="ml-2 text-gray-500 text-sm">
+            (Max possible:{" "}
+            {(() => {
+              if (!inventory?.l1_component) return 0;
+              return Math.min(
+                ...effectiveBOM.map((bom) => {
+                  const available = l1Map[bom.productId]?.quantity || 0;
+                  if (bom.qty === 0) return Infinity;
+                  return Math.floor(available / bom.qty);
+                })
+              );
+            })()}
+            )
+          </span>
+        </p>
 
-                      return (
-                        <React.Fragment key={order.id}>
-                          <tr className="border-t hover:bg-gray-50">
-                            <td className="px-4 py-3">#{order.id}</td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`px-2 py-1 rounded text-xs sm:text-sm font-medium ${
-                                  order.status === "started"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-green-100 text-green-800"
-                                }`}
-                              >
-                                {statusLabel}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {order.timestamp}
-                            </td>
-                            <td className={`px-4 py-3 ${outputClass}`}>
-                              {order.predictedOutput} /{" "}
-                              {order.actualOutput ??
-                                actualOutputs[order.id] ??
-                                "-"}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                                <button
-                                  onClick={() =>
-                                    setOpenDetails((prev) =>
-                                      prev === order.id ? null : order.id
-                                    )
-                                  }
-                                  className="text-sm text-blue-600 hover:underline"
-                                >
-                                  View Details
-                                </button>
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50 w-full sm:w-auto"
+        >
+          Start Production
+        </button>
+      </form>
 
-                                {order.status === "started" && (
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="text"
-                                      min="0"
-                                      step="any"
-                                      value={actualOutputs[order.id] ?? ""}
-                                      onChange={(e) =>
-                                        handleActualOutputChange(
-                                          order.id,
-                                          e.target.value
-                                        )
-                                      }
-                                      className="border border-gray-300 rounded px-2 py-1 w-20"
-                                      placeholder="Actual"
-                                    />
-                                    <button
-                                      onClick={() =>
-                                        handleCompleteProduction(order.id)
-                                      }
-                                      disabled={
-                                        actualOutputs[order.id] == null ||
-                                        actualOutputs[order.id] < 0
-                                      }
-                                      className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
-                                    >
-                                      Mark Done
-                                    </button>
+      {/* --- Production Orders Section --- */}
+      <section>
+        <h3 className="text-xl font-semibold mt-10 mb-4">
+          🛠️ Production Orders
+        </h3>
+        {inventory.productionOrders?.length > 0 ? (
+          <div className="min-w-full border text-sm">
+            <table className="min-w-full border text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-2">Order No</th>
+                  <th className="text-left px-4 py-2">Status</th>
+                  <th className="text-left px-4 py-2">Date</th>
+                  <th className="text-left px-4 py-2">
+                    Output (Predicted / Actual)
+                  </th>
+                  <th className="text-left px-4 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventory.productionOrders
+                  .slice()
+                  .reverse()
+                  .map((order) => {
+                    const discrepancy = inventory.logs?.find(
+                      (log) =>
+                        log.action.includes("⚠️") &&
+                        log.action.includes(`Order #${order.id}`)
+                    );
+
+                    const statusLabel =
+                      order.status === "started" ? "In Progress" : "Completed";
+                    const actualValRaw =
+                      order.actualOutput ?? actualOutputs[order.id] ?? null;
+                    const actualVal = actualValRaw === "" ? null : actualValRaw;
+                    const predNum = Number(order.predictedOutput) || 0;
+                    const actNum =
+                      actualVal != null ? Number(actualVal) || 0 : null;
+
+                    let outputClass = "text-gray-700";
+                    if (actNum != null) {
+                      if (predNum > actNum)
+                        outputClass = "text-red-600 font-semibold";
+                      else if (predNum === actNum)
+                        outputClass = "text-green-600 font-semibold";
+                    }
+
+                    return (
+                      <React.Fragment key={order.id}>
+                        <tr className="border-t hover:bg-gray-50">
+                          <td className="px-4 py-3">#{order.id}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-1 rounded text-xs sm:text-sm font-medium ${
+                                order.status === "started"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {statusLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {order.timestamp}
+                          </td>
+                          <td className={`px-4 py-3 ${outputClass}`}>
+                            {order.predictedOutput} /{" "}
+                            {order.actualOutput ??
+                              actualOutputs[order.id] ??
+                              "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                              {order.status === "completed" && (
+                                <div className="flex items-center justify-center gap-2 mt-2">
+                                  {(() => {
+                                    const outputMismatch =
+                                      Number(order.actualOutput) !==
+                                      Number(order.predictedOutput);
+                                    const materialDiscrepancies =
+                                      order.discrepancyMessages?.length || 0;
+
+                                    const totalDiscrepancies =
+                                      materialDiscrepancies +
+                                      (outputMismatch ? 1 : 0);
+
+                                    // const hasDiscrepancy =
+                                    //   totalDiscrepancies > 0;
+
+                                    const hasDiscrepancy =
+                                      totalDiscrepancies > 0 ||
+                                      Boolean(discrepancy);
+
+                                    const iconColor = hasDiscrepancy
+                                      ? "text-red-600"
+                                      : "text-green-600";
+                                    const textColor = hasDiscrepancy
+                                      ? "text-red-600"
+                                      : "text-green-600";
+                                    const icon = hasDiscrepancy ? "⚠️" : "✅";
+                                    const title = hasDiscrepancy
+                                      ? "Discrepancy"
+                                      : "Match";
+
+                                    const tooltipTitle = !hasDiscrepancy
+                                      ? "Order ready for assembly"
+                                      : `Check ${totalDiscrepancies} ${
+                                          totalDiscrepancies === 1
+                                            ? "discrepancy"
+                                            : "discrepancies"
+                                        }`;
+
+                                    let tooltipDetails = "";
+                                    if (
+                                      outputMismatch &&
+                                      materialDiscrepancies === 0
+                                    ) {
+                                      tooltipDetails = "(1 output mismatch)";
+                                    } else if (
+                                      !outputMismatch &&
+                                      materialDiscrepancies > 0
+                                    ) {
+                                      tooltipDetails = `(${materialDiscrepancies} material ${
+                                        materialDiscrepancies === 1
+                                          ? "issue"
+                                          : "issues"
+                                      })`;
+                                    } else if (
+                                      outputMismatch &&
+                                      materialDiscrepancies > 0
+                                    ) {
+                                      tooltipDetails = `(1 output mismatch, ${materialDiscrepancies} material ${
+                                        materialDiscrepancies === 1
+                                          ? "issue"
+                                          : "issues"
+                                      })`;
+                                    }
+
+                                    return (
+                                      <>
+                                        <span
+                                          title={title}
+                                          className={`${iconColor} text-sm font-semibold cursor-default`}
+                                        >
+                                          {icon}
+                                        </span>
+
+                                        <div className="relative flex flex-col items-center">
+                                          {/* View Details button (becomes the hover trigger) */}
+                                          <button
+                                            className={`${textColor} font-medium relative group`}
+                                          >
+                                            View Details
+                                            {/* Tooltip — visible only when hovering the button */}
+                                            <div
+                                              onClick={() =>
+                                                navigate(
+                                                  `/production/history/${order.id}`
+                                                )
+                                              }
+                                              className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white text-center w-max max-w-[220px]
+bg-black/90 backdrop-blur-md rounded-md
+opacity-0 hover:opacity-100 transition-opacity duration-200
+border border-gray-700 shadow-sm cursor-pointer hover:scale-[1.03]`}
+                                            >
+                                              {tooltipTitle}
+                                              {tooltipDetails && (
+                                                <div className="text-[10px] text-white-900 mt-0.5">
+                                                  {tooltipDetails}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </button>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                              {order.status === "started" && (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={actualOutputs[order.id] ?? ""}
+                                    onChange={(e) =>
+                                      handleActualOutputChange(
+                                        order.id,
+                                        e.target.value,
+                                        order.predicted
+                                      )
+                                    }
+                                    className="border border-gray-300 rounded px-2 py-1 w-20"
+                                    placeholder="Actual"
+                                  />
+                                  <button
+                                    onClick={() =>
+                                      handleCompleteProduction(order.id)
+                                    }
+                                    disabled={
+                                      actualOutputs[order.id] == "" || // empty input
+                                      actualOutputs[order.id] == 0 || // zero value
+                                      actualOutputs[order.id] >
+                                        order.predictedOutput // exceeds predicted
+                                    }
+                                    className="bg-green-600 text-white px-1 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+                                  >
+                                    Mark Done
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* {openDetails === order.id && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={5} className="px-4 py-3">
+                              <div className="space-y-2">
+                                <p className="font-semibold">Materials Used:</p>
+                                <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
+                                  {Object.entries(order.materialsUsed).map(
+                                    ([prodId, qty]) => {
+                                      const bom = effectiveBOM.find(
+                                        (b) => b.productId === prodId
+                                      );
+                                      return (
+                                        <li key={prodId}>
+                                          {bom?.name || prodId}: {qty}
+                                        </li>
+                                      );
+                                    }
+                                  )}
+                                </ul>
+
+                                {discrepancy && (
+                                  <div className="mt-4 bg-red-50 border-l-4 border-red-500 rounded-lg shadow-sm p-4 text-sm text-red-800">
+                                    {discrepancy.predicted !== undefined &&
+                                      discrepancy.actual !== undefined && (
+                                        <p className="font-semibold">
+                                          ⚠️ Predicted: {discrepancy.predicted}{" "}
+                                          | Actual: {discrepancy.actual}
+                                        </p>
+                                      )}
+                                    {discrepancy.action && (
+                                      <>
+                                        {discrepancy.action
+                                          .split("\n")
+                                          .map((line, i) => (
+                                            <p
+                                              key={i}
+                                              className="mt-1 text-xs bg-red-100 rounded p-1"
+                                            >
+                                              {line}
+                                            </p>
+                                          ))}
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
                             </td>
                           </tr>
-
-                          {openDetails === order.id && (
-                            <tr className="bg-gray-50">
-                              <td colSpan={5} className="px-4 py-3">
-                                <div className="space-y-2">
-                                  <p className="font-semibold">
-                                    Materials Used:
-                                  </p>
-                                  <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
-                                    {Object.entries(order.materialsUsed).map(
-                                      ([prodId, qty]) => {
-                                        const bom = effectiveBOM.find(
-                                          (b) => b.productId === prodId
-                                        );
-                                        return (
-                                          <li key={prodId}>
-                                            {bom?.name || prodId}: {qty}
-                                          </li>
-                                        );
-                                      }
-                                    )}
-                                  </ul>
-
-                                  {discrepancy && (
-                                    <div className="mt-4 bg-red-50 border-l-4 border-red-500 rounded-lg shadow-sm p-4 text-sm text-red-800">
-                                      {discrepancy.predicted !== undefined &&
-                                        discrepancy.actual !== undefined && (
-                                          <p className="font-semibold">
-                                            ⚠️ Predicted:{" "}
-                                            {discrepancy.predicted} | Actual:{" "}
-                                            {discrepancy.actual}
-                                          </p>
-                                        )}
-                                      {discrepancy.action && (
-                                        <>
-                                          {discrepancy.action
-                                            .split("\n")
-                                            .map((line, i) => (
-                                              <p
-                                                key={i}
-                                                className="mt-1 text-xs bg-red-100 rounded p-1"
-                                              >
-                                                {line}
-                                              </p>
-                                            ))}
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-gray-500 italic">No production orders.</p>
-          )}
-        </section>
-      </div>
-    </main>
+                        )} */}
+                      </React.Fragment>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-500 italic">No production orders.</p>
+        )}
+      </section>
+    </div>
+    // </main>
   );
 };
 
