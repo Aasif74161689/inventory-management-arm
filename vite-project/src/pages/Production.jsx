@@ -412,7 +412,7 @@ const Production = () => {
               value={requiredOutput}
               onChange={handleRequiredOutputChange}
               className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-24 sm:w-32"
-              placeholder="Number"
+              placeholder="Plate count"
             />
             <span className="text-gray-500 text-sm">
               (Autofills material quantities)
@@ -501,8 +501,8 @@ const Production = () => {
           🛠️ Production Orders
         </h3>
         {inventory.productionOrders?.length > 0 ? (
-          <div className="min-w-full border text-sm">
-            <table className="min-w-full border text-sm">
+          <div className="min-w-full border-gray-900 text-sm">
+            <table className="min-w-full bg-white border-gray-900  text-sm">
               <thead className="bg-gray-100">
                 <tr>
                   <th className="text-left px-4 py-2">Order No</th>
@@ -708,56 +708,6 @@ border border-gray-700 shadow-sm cursor-pointer hover:scale-[1.03]`}
                             </div>
                           </td>
                         </tr>
-
-                        {/* {openDetails === order.id && (
-                          <tr className="bg-gray-50">
-                            <td colSpan={5} className="px-4 py-3">
-                              <div className="space-y-2">
-                                <p className="font-semibold">Materials Used:</p>
-                                <ul className="list-disc list-inside ml-5 capitalize text-gray-700">
-                                  {Object.entries(order.materialsUsed).map(
-                                    ([prodId, qty]) => {
-                                      const bom = effectiveBOM.find(
-                                        (b) => b.productId === prodId
-                                      );
-                                      return (
-                                        <li key={prodId}>
-                                          {bom?.name || prodId}: {qty}
-                                        </li>
-                                      );
-                                    }
-                                  )}
-                                </ul>
-
-                                {discrepancy && (
-                                  <div className="mt-4 bg-red-50 border-l-4 border-red-500 rounded-lg shadow-sm p-4 text-sm text-red-800">
-                                    {discrepancy.predicted !== undefined &&
-                                      discrepancy.actual !== undefined && (
-                                        <p className="font-semibold">
-                                          ⚠️ Predicted: {discrepancy.predicted}{" "}
-                                          | Actual: {discrepancy.actual}
-                                        </p>
-                                      )}
-                                    {discrepancy.action && (
-                                      <>
-                                        {discrepancy.action
-                                          .split("\n")
-                                          .map((line, i) => (
-                                            <p
-                                              key={i}
-                                              className="mt-1 text-xs bg-red-100 rounded p-1"
-                                            >
-                                              {line}
-                                            </p>
-                                          ))}
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )} */}
                       </React.Fragment>
                     );
                   })}

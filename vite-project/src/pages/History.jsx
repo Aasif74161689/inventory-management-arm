@@ -444,10 +444,8 @@ export default function History() {
                   return (
                     <li
                       key={log.id ?? i}
-                      className={`border rounded p-3 ${
-                        isDiscrepancy
-                          ? "bg-red-50 border-red-300 text-red-800"
-                          : "bg-white"
+                      className={` p-3 ${
+                        isDiscrepancy ? "bg-red-50 text-red-800" : "bg-white"
                       }`}
                     >
                       <div className="flex justify-between items-start">

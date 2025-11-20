@@ -155,7 +155,7 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
     });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 px-4 sm:px-0">
+    <div className="fixed inset-0 flex items-center justify-center z-50 px-4 sm:px-0">
       <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-[700px] max-h-[85vh] shadow-lg overflow-y-auto">
         <h3 className="text-lg sm:text-xl font-bold mb-4 text-center gap-2 flex justify-between items-center">
           🔧 Update Stock
@@ -271,76 +271,6 @@ const BulkStockUpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
           </div>
         ) : (
           <>
-            {/* {stockData.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-12">
-                {[
-                  stockData.slice(0, Math.ceil(stockData.length / 2)),
-                  stockData.slice(Math.ceil(stockData.length / 2)),
-                ].map((half, idx) => (
-                  <div key={idx} className="space-y-3">
-                    {half.map((item) => (
-                      <div
-                        key={item.productId || item.productName}
-                        className="flex justify-between items-center"
-                      >
-                        <span className="capitalize text-sm sm:text-base">
-                          {item.productName} ({item.unit})
-                        </span>
-                        <input
-                          type={
-                            item.productName.toLowerCase().includes("bag") ||
-                            item.productName.toLowerCase().includes("bottom")
-                              ? "text"
-                              : "number"
-                          }
-                          inputMode="numeric"
-                          pattern={
-                            item.productName.toLowerCase().includes("bag") ||
-                            item.productName.toLowerCase().includes("bottom")
-                              ? "[0-9]*"
-                              : "[0-9]*[.,]?[0-9]*"
-                          }
-                          placeholder={String(item.available)}
-                          value={item.qty === 0 ? "" : item.qty}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const isBagOrBottom =
-                              item.productName.toLowerCase().includes("bag") ||
-                              item.productName.toLowerCase().includes("bottom");
-
-                            // Allow only digits (no decimals or negatives) for bag/bottom
-                            if (isBagOrBottom) {
-                              if (!/^\d*$/.test(val)) return;
-                            } else {
-                              // For other numeric fields
-                              // Allow negatives, decimals, but limit to available
-                              const num = Number(val);
-
-                              // Block invalid input (non-numeric but allow empty)
-                              if (val !== "" && isNaN(num)) return;
-
-                              // Restrict: negative allowed but not less than -available
-                              if (num < -item.available) return;
-
-                              // Restrict: positive not more than available
-                              if (num > item.available) return;
-                            }
-
-                            handleChange(stockData.indexOf(item), val);
-                          }}
-                          className="border px-2 py-1 rounded w-20 sm:w-28 text-right text-sm sm:text-base"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-center py-6 text-sm sm:text-base">
-                ⚠️ No inventory data found.
-              </p>
-            )} */}
-
             {stockData.length > 0 ? (
               <div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-12">

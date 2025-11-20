@@ -143,7 +143,7 @@ const BulkL2UpdateModal = ({ isOpen, onClose, materials, setInventory }) => {
     });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 px-4 sm:px-0">
+    <div className="fixed inset-0 flex items-center justify-center z-50 px-4 sm:px-0">
       <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-[700px] max-h-[85vh] shadow-lg overflow-y-auto">
         <h3 className="text-lg sm:text-xl font-bold mb-4 text-center gap-2 flex justify-between items-center">
           🔧 Update L2 Stock

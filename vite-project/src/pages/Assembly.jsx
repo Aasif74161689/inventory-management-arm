@@ -254,13 +254,13 @@ const Assembly = () => {
   return (
     <div className="w-full max-w-5xl mx-auto p-4 space-y-8">
       <h2 className="text-3xl font-bold text-center mb-6">
-        ⚙️ Inverter Assembly
+        ⚙️ Battery Assembly
       </h2>
 
       {/* --- BOM --- */}
       <div className="border border-gray-300 rounded-md p-4 bg-gray-50">
         <h3 className="text-xl font-semibold mb-4 text-center">
-          🧾 BOM for 1 Inverter
+          🧾 BOM for 1 Battery
         </h3>
         <div className="flex flex-wrap gap-6">
           {[
@@ -291,7 +291,7 @@ const Assembly = () => {
             type="text"
             value={requiredOutput}
             onChange={handleRequiredOutputChange}
-            placeholder="Enter inverter count"
+            placeholder="battery count"
             className="border rounded px-3 py-2 w-32 text-center"
           />
           <span className="text-gray-500 text-sm">
@@ -361,7 +361,7 @@ const Assembly = () => {
         <h3 className="text-xl font-semibold mt-10 mb-4">🛠️ Assembly Orders</h3>
         {inventory?.assemblyOrders && inventory.assemblyOrders.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full border text-sm">
+            <table className="min-w-full bg-white text-sm">
               <thead className="bg-gray-100">
                 <tr>
                   <th className="px-4 py-2 text-left">Order No</th>

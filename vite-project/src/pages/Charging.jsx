@@ -89,9 +89,32 @@ const Charging = () => {
     );
   };
 
+  // const handleOpenChargeModal = (assemblyOrderId = null) => {
+  //   setChargingFromBatch(assemblyOrderId);
+  //   setChargeFormData({ quantity: "", startTime: "", duration: "", notes: "" });
+  //   setShowChargeModal(true);
+  // };
+
   const handleOpenChargeModal = (assemblyOrderId = null) => {
+    let maxQty = null;
+
+    if (assemblyOrderId) {
+      const order = inventory.assemblyOrders.find(
+        (o) => o.id === assemblyOrderId
+      );
+      maxQty = order?.actualOutput || order?.predictedOutput || null;
+    }
+
     setChargingFromBatch(assemblyOrderId);
-    setChargeFormData({ quantity: "", startTime: "", duration: "", notes: "" });
+
+    setChargeFormData({
+      quantity: "",
+      startTime: "",
+      duration: "",
+      notes: "",
+      maxQty, // ✅ store max available batteries
+    });
+
     setShowChargeModal(true);
   };
 
@@ -547,7 +570,7 @@ const Charging = () => {
 
       {/* Charging Modal */}
       {showChargeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg max-h-screen overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">
               ⚡ Start Charging Session
@@ -559,7 +582,7 @@ const Charging = () => {
                 <label htmlFor="quantity" className="block font-medium mb-1">
                   Number of Batteries to Charge
                 </label>
-                <input
+                {/* <input
                   id="quantity"
                   name="quantity"
                   type="number"
@@ -569,6 +592,33 @@ const Charging = () => {
                   onChange={handleChargeFormChange}
                   className="border border-gray-300 rounded px-3 py-2 w-full"
                   placeholder="e.g., 50"
+                  required
+                /> */}
+
+                <input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  min="1"
+                  step="any"
+                  max={chargeFormData.maxQty || undefined}
+                  value={chargeFormData.quantity}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val <= (chargeFormData.maxQty || Infinity)) {
+                      setChargeFormData((prev) => ({ ...prev, quantity: val }));
+                    }
+                  }}
+                  className={`border border-gray-300 rounded px-3 py-2 w-full ${
+                    chargeFormData.quantity > chargeFormData.maxQty
+                      ? "border-black-500 "
+                      : ""
+                  }`}
+                  placeholder={
+                    chargeFormData.maxQty
+                      ? `Max: ${chargeFormData.maxQty}`
+                      : "e.g., 50"
+                  }
                   required
                 />
               </div>
@@ -662,6 +712,20 @@ const Charging = () => {
                 >
                   Start Charging
                 </button>
+                {/* <button
+                  type="submit"
+                  disabled={
+                    !chargeFormData.quantity ||
+                    chargeFormData.quantity > chargeFormData.maxQty
+                  }
+                  className={`px-4 py-2 rounded text-white ${
+                    chargeFormData.quantity > chargeFormData.maxQty
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  Start Charging
+                </button> */}
               </div>
             </form>
           </div>
