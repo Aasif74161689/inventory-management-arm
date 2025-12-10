@@ -3,6 +3,8 @@ import { fetchInventory, updateInventory } from "../firebaseService";
 import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import { toast } from "react-toastify";
+import { normalizeBOM } from "../utils/normalizeBOM";
+import PlateBOM from "../components/PlateBOM";
 
 const Production = () => {
   const [inventory, setInventory] = useState(null);
@@ -10,6 +12,7 @@ const Production = () => {
   const [predictedOutput, setPredictedOutput] = useState(0);
   const [requiredOutput, setRequiredOutput] = useState("");
   const [actualOutputs, setActualOutputs] = useState({});
+  const [currentBOMTab, setCurrentBOMTab] = useState("positive"); // "positive" | "negative"
   // const [openDetails, setOpenDetails] = useState(null);
   const navigate = useNavigate();
 
@@ -26,7 +29,15 @@ const Production = () => {
   }, []);
 
   // Use BOM from inventory if present, otherwise fallback to empty array
-  const effectiveBOM = inventory?.plateBOM || [];
+  // const effectiveBOM = inventory?.plateBOM || [];
+
+  const effectiveBOM =
+    currentBOMTab === "positive"
+      ? inventory?.plateBOM?.positivePlateBOM || []
+      : inventory?.plateBOM?.negativePlateBOM || [];
+
+  const positiveBOM = normalizeBOM(inventory?.plateBOM?.positivePlateBOM || []);
+  const negativeBOM = normalizeBOM(inventory?.plateBOM?.negativePlateBOM || []);
 
   // Map BOM productId to inventory l1_component for easier access
   const l1Map = {};
@@ -36,20 +47,17 @@ const Production = () => {
     });
   }
 
-  // Initialize materialsInput keys based on BOM
   useEffect(() => {
-    if (
-      effectiveBOM &&
-      effectiveBOM.length > 0 &&
-      Object.keys(materialsInput).length === 0
-    ) {
-      const initial = {};
-      effectiveBOM.forEach((bom) => {
-        initial[bom.productId] = 0;
-      });
-      setMaterialsInput(initial);
-    }
-  }, [effectiveBOM, materialsInput]);
+    if (!effectiveBOM) return;
+
+    const initial = {};
+    effectiveBOM.forEach((bom) => {
+      initial[bom.productId] = 0;
+    });
+    setMaterialsInput(initial);
+    setRequiredOutput("");
+    setPredictedOutput(0);
+  }, [currentBOMTab]);
 
   const handleChange = (e, productId) => {
     const value = e.target.value;
@@ -209,6 +217,7 @@ const Production = () => {
       status: "started",
       predictedOutput,
       timestamp,
+      bomType: currentBOMTab,
     };
 
     updatedLogs.push({
@@ -308,20 +317,6 @@ const Production = () => {
       }
     );
 
-    // if (discrepancyMessages.length > 0) {
-    //   newLogs.push({
-    //     timestamp,
-    //     logType: "discrepancy",
-    //     action: `⚠️ Discrepancy in Production #${orderId} - ${discrepancyMessages.join(
-    //       "; "
-    //     )}`,
-    //   });
-    //   completedOrder.discrepancyMessages = discrepancyMessages;
-    // } else {
-    //   // ✅ no log for clean orders
-    //   completedOrder.discrepancyMessages = [];
-    // }
-
     if (discrepancyMessages.length > 0) {
       // Replace PD-XXX with actual name from effectiveBOM or l1_component
       const formattedDiscrepancies = discrepancyMessages.map((msg) => {
@@ -369,36 +364,44 @@ const Production = () => {
     // <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 md:px-8 py-4 pb-16 md:pb-4">
     <div className="w-full max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden">
       <h2 className="text-3xl font-bold text-center mb-6">Plate Production</h2>
-
-      {/* --- BOM Section --- */}
-      <div className="border border-gray-300 rounded-md p-4 sm:p-6 mb-8 bg-gray-50 w-full">
-        <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-center">
-          🧾 BOM for 1 Plate
-        </h3>
-
-        <div className="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-6 w-full">
-          {/* Split array into two halves */}
-          {[
-            effectiveBOM.slice(0, Math.ceil(effectiveBOM.length / 2)),
-            effectiveBOM.slice(Math.ceil(effectiveBOM.length / 2)),
-          ].map((half, idx) => (
-            <ul
-              key={idx}
-              className="list-none space-y-2 text-gray-700 capitalize flex-1"
-            >
-              {half.map((bom) => (
-                <li key={bom.productId} className="text-sm sm:text-base">
-                  <span className="font-medium">{bom.name}</span>: {bom.qty} (
-                  Stock: {l1Map[bom.productId]?.quantity || 0}{" "}
-                  {l1Map[bom.productId]?.unit || ""})
-                </li>
-              ))}
-            </ul>
-          ))}
-        </div>
+      <div className="flex gap-4 mb-4 justify-center">
+        <button
+          className={`px-4 py-2 rounded  cursor-pointer hover:bg-blue-100 ${
+            currentBOMTab === "positive"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 text-gray-700"
+          }`}
+          onClick={() => setCurrentBOMTab("positive")}
+        >
+          Positive Plate
+        </button>
+        <button
+          className={`px-4 py-2 rounded cursor-pointer hover:bg-blue-100 ${
+            currentBOMTab === "negative"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 text-gray-700"
+          }`}
+          onClick={() => setCurrentBOMTab("negative")}
+        >
+          Negative Plate
+        </button>
       </div>
-
-      {/* --- Form Section --- */}
+      {/* --- BOM Section --- */}
+      {currentBOMTab === "positive" && (
+        <PlateBOM
+          title="Positive Plate"
+          bomList={positiveBOM}
+          stockMap={l1Map}
+        />
+      )}
+      {currentBOMTab === "negative" && (
+        <PlateBOM
+          title="Negative Plate"
+          bomList={negativeBOM}
+          stockMap={l1Map}
+        />
+      )}
+      ;{/* --- Form Section --- */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
           <label htmlFor="requiredOutput" className="font-medium">
@@ -423,10 +426,11 @@ const Production = () => {
         {/* --- Material Inputs Grid --- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {effectiveBOM.map((bom) => {
-            // ✅ Check if the item should allow only integers
+            const bomName = String(bom.productName || bom.name || "");
+
             const isIntegerOnly =
-              bom.name.toLowerCase().includes("bag") ||
-              bom.name.toLowerCase().includes("bottom");
+              bomName.toLowerCase().includes("bag") ||
+              bomName.toLowerCase().includes("bottom");
 
             return (
               <div key={bom.productId} className="flex flex-col">
@@ -434,14 +438,14 @@ const Production = () => {
                   htmlFor={bom.productId}
                   className="mb-1 font-medium capitalize text-sm sm:text-base"
                 >
-                  {bom.name} ({l1Map[bom.productId]?.unit || ""}):
+                  {bomName} ({l1Map[bom.productId]?.unit || ""}):
                 </label>
                 <input
                   id={bom.productId}
                   name={bom.productId}
                   type="number"
                   min="0"
-                  step={isIntegerOnly ? "1" : "any"} // ✅ integer-only restriction
+                  step={isIntegerOnly ? "1" : "any"}
                   value={
                     materialsInput[bom.productId] === 0
                       ? 0
@@ -450,15 +454,15 @@ const Production = () => {
                   onChange={(e) => {
                     let value = e.target.value;
 
-                    // ✅ Prevent decimals for bags and bottom
+                    // ✅ Prevent decimals for integer-only items
                     if (isIntegerOnly && value.includes(".")) {
                       alert(
-                        `${bom.name} must be a whole number (no decimals allowed).`
+                        `${bomName} must be a whole number (no decimals allowed).`
                       );
                       return;
                     }
 
-                    handleChange(e, bom.productId, bom.productName);
+                    handleChange(e, bom.productId);
                   }}
                   className="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
                 />
@@ -494,7 +498,6 @@ const Production = () => {
           Start Production
         </button>
       </form>
-
       {/* --- Production Orders Section --- */}
       <section>
         <h3 className="text-xl font-semibold mt-10 mb-4">
@@ -516,13 +519,14 @@ const Production = () => {
               </thead>
               <tbody>
                 {inventory.productionOrders
+                  .filter((order) => order.bomType === currentBOMTab)
                   .slice()
                   .reverse()
                   .map((order) => {
                     const discrepancy = inventory.logs?.find(
                       (log) =>
-                        log.action.includes("⚠️") &&
-                        log.action.includes(`Order #${order.id}`)
+                        log.action?.includes("⚠️") &&
+                        log.action?.includes(`Order #${order.id}`)
                     );
 
                     const statusLabel =

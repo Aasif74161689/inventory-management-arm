@@ -1,67 +1,77 @@
 import React, { useState, useEffect } from "react";
 import { fetchInventory, updateInventory } from "../firebaseService";
 import Loader from "../components/Loader";
+import { toast } from "react-toastify";
 
 const Shipment = () => {
   const [inventory, setInventory] = useState(null);
-  const [openDetails, setOpenDetails] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+
   const [formData, setFormData] = useState({
-    chargeId: "",
     destination: "",
     quantity: "",
     status: "packed",
+    shipmentTime: "",
   });
-  const [editId, setEditId] = useState(null);
 
+  // Input datetime-local format (no seconds)
+  const nowForInput = () => {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+  };
+
+  // Fetch inventory
   useEffect(() => {
     (async () => {
-      try {
-        const data = await fetchInventory();
-        setInventory(data || {});
-      } catch (err) {
-        console.error("Error fetching inventory:", err);
-        setInventory({});
-      }
+      const data = await fetchInventory();
+      setInventory(data || {});
     })();
   }, []);
 
-  // Get available charged batteries not yet shipped
-  // const getAvailableChargedBatteries = () => {
-  //   return (inventory?.chargedBatteries || []).filter(
-  //     (c) => c.status === "completed"
-  //   );
-  // };
+  // Totals
+  const totalProduced = (inventory?.orders || [])
+    .filter((o) => o.status === "done")
+    .reduce((sum, o) => sum + Number(o.quantity), 0);
 
-  const getAvailableChargedBatteries = () => {
-    const charged = inventory?.chargedBatteries || [];
-    const shipments = inventory?.shipments || [];
+  const totalShipped = (inventory?.shipments || []).reduce(
+    (sum, s) => sum + Number(s.quantity),
+    0
+  );
 
-    return charged
-      .filter((charge) => charge.status === "completed") // ✅ Only completed batches
-      .filter((charge) => {
-        const shippedQty = shipments
-          .filter((s) => s.chargeId == charge.id)
-          .reduce((sum, s) => sum + Number(s.quantity), 0);
+  const totalAvailable = Math.max(totalProduced - totalShipped, 0);
+  const shipments = (inventory?.shipments || []).slice().reverse();
 
-        const totalAvailable =
-          (charge.actualChargedCount || charge.predictedOutput) - shippedQty;
+  // ⭐ CORRECTED: Logs formatted for History Page
+  const addLog = (action) => {
+    const formattedTime = new Date().toLocaleString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hour12: true,
+    });
 
-        return totalAvailable > 0; // only show batches with remaining units
-      });
+    const newLog = {
+      action, // History page expects "action"
+      timestamp: formattedTime, // Human-readable timestamp
+    };
+
+    const logs = inventory.logs || [];
+    return [...logs, newLog];
   };
 
-  // Get shipments
-  const getShipments = () => {
-    return (inventory?.shipments || []).slice().reverse();
-  };
-
+  // Reset form
   const resetForm = () => {
     setFormData({
-      chargeId: "",
       destination: "",
       quantity: "",
       status: "packed",
+      shipmentTime: nowForInput(),
     });
     setEditId(null);
   };
@@ -69,10 +79,10 @@ const Shipment = () => {
   const handleOpenModal = (shipment = null) => {
     if (shipment) {
       setFormData({
-        chargeId: shipment.chargeId,
         destination: shipment.destination,
         quantity: shipment.quantity,
         status: shipment.status,
+        shipmentTime: shipment.timestamp || nowForInput(),
       });
       setEditId(shipment.id);
     } else {
@@ -91,545 +101,252 @@ const Shipment = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Get the charged count for a batch ID
-  const getChargedCount = (chargeId) => {
-    const charge = inventory?.chargedBatteries?.find(
-      (c) => c.id === parseInt(chargeId)
-    );
-    return charge ? charge.actualChargedCount || charge.predictedOutput : 0;
-  };
-
-  // Get status badge color
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case "packed":
-        return "bg-yellow-100 text-yellow-800";
-      case "shipped":
-        return "bg-blue-100 text-blue-800";
-      case "in-transit":
-        return "bg-purple-100 text-purple-800";
-      case "delivered":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  // Get status label
-  const getStatusLabel = (status) => {
-    return status
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
-
+  // Save shipment
   const handleSubmitShipment = async (e) => {
     e.preventDefault();
 
-    if (!formData.chargeId || !formData.destination || !formData.quantity) {
-      alert("Please fill all fields");
+    if (!formData.destination || !formData.quantity) {
+      toast.error("Please fill all fields");
       return;
     }
 
-    const qty = parseFloat(formData.quantity);
-    if (isNaN(qty) || qty <= 0) {
-      alert("Quantity must be a positive number");
-      return;
-    }
+    const qty = Number(formData.quantity);
+    if (qty <= 0) return toast.error("Quantity must be positive");
+    if (qty > totalAvailable && !editId)
+      return toast.error(`Cannot ship more than available (${totalAvailable})`);
 
-    const chargedCount = getChargedCount(formData.chargeId);
-    if (qty > chargedCount) {
-      alert(
-        `Shipment quantity cannot exceed available charged count (${chargedCount})`
-      );
-      return;
-    }
+    const rawTime = formData.shipmentTime || nowForInput();
+    const time = rawTime.length === 16 ? rawTime + ":00" : rawTime;
 
-    const confirmShip = window.confirm(
-      `Create shipment?\n\nCharge Batch: #${formData.chargeId}\nAvailable: ${chargedCount}\nShip Quantity: ${qty}\nDestination: ${formData.destination}\n\nProceed?`
-    );
-    if (!confirmShip) return;
-
-    const timestamp = new Date().toLocaleString();
+    let updatedShipments = inventory.shipments || [];
+    let logText = "";
 
     if (editId) {
-      // Update existing shipment
-      const updatedShipments = inventory.shipments.map((s) =>
+      const oldData = inventory.shipments.find((s) => s.id === editId);
+
+      updatedShipments = updatedShipments.map((s) =>
         s.id === editId
           ? {
               ...s,
-              chargeId: formData.chargeId,
               destination: formData.destination,
               quantity: qty,
               status: formData.status,
-              updatedAt: timestamp,
+              timestamp: time,
             }
           : s
       );
 
-      const updatedInv = {
-        ...inventory,
-        shipments: updatedShipments,
-        logs: [
-          ...(inventory.logs || []),
-          {
-            timestamp,
-            action: `📋 Shipment #${editId} updated - Status: ${getStatusLabel(
-              formData.status
-            )}, Destination: ${formData.destination}, Qty: ${qty}`,
-          },
-        ],
-      };
+      // Detect what changed
+      if (formData.status !== oldData.status) {
+        if (formData.status === "shipped") {
+          logText = `🚚 Shipment #${editId} shipped (Qty=${qty})`;
+        } else if (formData.status === "in-transit") {
+          logText = `📦➡️ Shipment #${editId} is in transit (Qty=${qty})`;
+        } else if (formData.status === "delivered") {
+          logText = `📬 Shipment #${editId} delivered (Qty=${qty})`;
+        } else {
+          logText = `✏️ Shipment #${editId} updated (status changed)`;
+        }
+      } else if (
+        formData.destination !== oldData.destination ||
+        qty !== oldData.quantity
+      ) {
+        logText = `✏️ Shipment #${editId} updated: Destination=${formData.destination}, Qty=${qty}`;
+      } else {
+        logText = `✏️ Shipment #${editId} updated`;
+      }
 
-      setInventory(updatedInv);
-      await updateInventory(updatedInv);
+      toast.success("Shipment updated successfully");
     } else {
-      // Create new shipment
       const newShipment = {
-        id: (inventory?.shipments?.length || 0) + 1,
-        chargeId: formData.chargeId,
+        id: updatedShipments.length + 1,
         destination: formData.destination,
         quantity: qty,
         status: formData.status,
-        timestamp,
+        timestamp: time,
       };
+      updatedShipments.push(newShipment);
 
-      const updatedShipments = [...(inventory?.shipments || []), newShipment];
-      const updatedInv = {
-        ...inventory,
-        shipments: updatedShipments,
-        logs: [
-          ...(inventory.logs || []),
-          {
-            timestamp,
-            action: `📦 New shipment created - Status: ${getStatusLabel(
-              formData.status
-            )}, Destination: ${formData.destination}, Qty: ${qty}`,
-          },
-        ],
-      };
-
-      setInventory(updatedInv);
-      await updateInventory(updatedInv);
+      logText = `📦 Shipment #${newShipment.id} created: Destination=${newShipment.destination}, Qty=${newShipment.quantity}`;
+      toast.success("Shipment created successfully");
     }
+
+    const updatedLogs = addLog(logText);
+
+    const updatedInv = {
+      ...inventory,
+      shipments: updatedShipments,
+      logs: updatedLogs,
+    };
+
+    await updateInventory(updatedInv);
+    const fresh = await fetchInventory();
+    setInventory(fresh);
 
     handleCloseModal();
   };
 
-  const handleShipNow = async (shipmentId) => {
-    if (!inventory) return;
+  // Delete shipment
+  const handleDeleteShipment = async (id) => {
+    if (!window.confirm("Delete shipment?")) return;
 
-    const shipment = inventory.shipments.find((s) => s.id === shipmentId);
-    if (!shipment) return;
+    const updatedShipments = inventory.shipments.filter((s) => s.id !== id);
 
-    const confirmShipNow = window.confirm(
-      `Update Shipment #${shipmentId}?\n\nDestination: ${
-        shipment.destination
-      }\nQuantity: ${shipment.quantity}\nCurrent Status: ${getStatusLabel(
-        shipment.status
-      )}\n\nProceed?`
-    );
-    if (!confirmShipNow) return;
-
-    const timestamp = new Date().toLocaleString();
-    const updatedShipments = inventory.shipments.map((s) =>
-      s.id === shipmentId
-        ? { ...s, status: "shipped", shippedAt: timestamp }
-        : s
-    );
+    const logText = `🗑 Shipment #${id} deleted`;
+    const updatedLogs = addLog(logText);
 
     const updatedInv = {
       ...inventory,
       shipments: updatedShipments,
-      logs: [
-        ...(inventory.logs || []),
-        {
-          timestamp,
-          action: `✈️ Shipment #${shipmentId} status updated to Shipped - Destination: ${shipment.destination} with ${shipment.quantity} units`,
-        },
-      ],
+      logs: updatedLogs,
     };
 
-    setInventory(updatedInv);
     await updateInventory(updatedInv);
+    const fresh = await fetchInventory();
+    setInventory(fresh);
+
+    toast.success("Shipment deleted successfully");
   };
 
-  const handleDeleteShipment = async (shipmentId) => {
-    const confirmDelete = window.confirm(`Delete Shipment #${shipmentId}?`);
-    if (!confirmDelete) return;
-
-    const timestamp = new Date().toLocaleString();
-    const updatedShipments = inventory.shipments.filter(
-      (s) => s.id !== shipmentId
-    );
-
-    const updatedInv = {
-      ...inventory,
-      shipments: updatedShipments,
-      logs: [
-        ...(inventory.logs || []),
-        {
-          timestamp,
-          action: `🗑️ Shipment #${shipmentId} deleted`,
-        },
-      ],
-    };
-
-    setInventory(updatedInv);
-    await updateInventory(updatedInv);
+  const formatDisplayTime = (ts) => {
+    if (!ts) return "";
+    return new Date(ts).toLocaleString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hour12: true,
+    });
   };
 
   if (!inventory) return <Loader />;
 
-  const availableChargedBatteries = getAvailableChargedBatteries();
-  const shipments = getShipments();
-
   return (
-    <div className="max-w-5xl mx-auto p-4 space-y-8">
-      <h2 className="text-3xl font-bold text-center mb-6">
-        📦 Shipment Management
+    <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-8">
+      <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6">
+        📦 Dishpatch Management
       </h2>
 
+      {/* Available Batteries */}
+      <section className="p-4 bg-gray-100 border rounded">
+        <h3 className="text-lg sm:text-xl font-semibold">
+          🔋 Total Batteries Available
+        </h3>
+        <p className="text-3xl sm:text-4xl font-bold">{totalAvailable}</p>
+      </section>
+
+      {/* Shipment List */}
       <section>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold">📮 Shipments</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h3 className="text-xl sm:text-2xl font-semibold">📮 Shipments</h3>
+
           <button
             onClick={() => handleOpenModal()}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded w-full sm:w-auto"
           >
             + New Shipment
           </button>
         </div>
 
-        {shipments.length > 0 ? (
+        {shipments.length === 0 ? (
+          <p>No shipments.</p>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200 rounded">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="text-left px-4 py-2">Order #</th>
-                  <th className="text-left px-4 py-2">Charge Batch</th>
-                  <th className="text-left px-4 py-2">Destination</th>
-                  <th className="text-left px-4 py-2">Quantity</th>
-                  <th className="text-left px-4 py-2">Status</th>
-                  <th className="text-left px-4 py-2">Date</th>
-                  <th className="text-left px-4 py-2">Actions</th>
+            <table className="min-w-[800px] w-full border text-sm sm:text-base">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="p-2 text-left">Order #</th>
+                  <th className="p-2 text-left">Destination</th>
+                  <th className="p-2 text-left">Qty</th>
+                  <th className="p-2 text-left">Status</th>
+                  <th className="p-2 text-left">Time</th>
+                  <th className="p-2 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {shipments.map((shipment) => (
-                  <React.Fragment key={shipment.id}>
-                    <tr className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-3">#{shipment.id}</td>
-                      <td className="px-4 py-3">#{shipment.chargeId}</td>
-                      <td className="px-4 py-3">{shipment.destination}</td>
-                      <td className="px-4 py-3">{shipment.quantity}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 rounded text-sm font-medium ${getStatusBadgeClass(
-                            shipment.status
-                          )}`}
+                {shipments.map((s) => (
+                  <tr key={s.id} className="border-t">
+                    <td className="p-2">#{s.id}</td>
+                    <td className="p-2">{s.destination}</td>
+                    <td className="p-2">{s.quantity}</td>
+                    <td className="p-2 capitalize">{s.status}</td>
+                    <td className="p-2">{formatDisplayTime(s.timestamp)}</td>
+
+                    <td className="p-2 whitespace-nowrap">
+                      {s.status !== "delivered" && (
+                        <button
+                          onClick={() => handleOpenModal(s)}
+                          className="text-blue-600 mr-3"
                         >
-                          {getStatusLabel(shipment.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{shipment.timestamp}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() =>
-                              setOpenDetails((prev) =>
-                                prev === shipment.id ? null : shipment.id
-                              )
-                            }
-                            className="text-sm text-blue-600 hover:underline"
-                          >
-                            View Details
-                          </button>
+                          Edit
+                        </button>
+                      )}
 
-                          {shipment.status !== "delivered" && (
-                            <>
-                              <button
-                                onClick={() => handleOpenModal(shipment)}
-                                className="text-sm text-purple-600 hover:underline"
-                              >
-                                Edit
-                              </button>
-                              {shipment.status === "packed" && (
-                                <button
-                                  onClick={() => handleShipNow(shipment.id)}
-                                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
-                                >
-                                  → Shipped
-                                </button>
-                              )}
-                              {shipment.status === "shipped" && (
-                                <button
-                                  onClick={() => {
-                                    const timestamp =
-                                      new Date().toLocaleString();
-                                    const updatedShipments =
-                                      inventory.shipments.map((s) =>
-                                        s.id === shipment.id
-                                          ? { ...s, status: "in-transit" }
-                                          : s
-                                      );
-                                    const updatedInv = {
-                                      ...inventory,
-                                      shipments: updatedShipments,
-                                      logs: [
-                                        ...(inventory.logs || []),
-                                        {
-                                          timestamp,
-                                          action: `🚚 Shipment #${shipment.id} status updated to In Transit`,
-                                        },
-                                      ],
-                                    };
-                                    setInventory(updatedInv);
-                                    updateInventory(updatedInv);
-                                  }}
-                                  className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 text-sm"
-                                >
-                                  → In Transit
-                                </button>
-                              )}
-                              {shipment.status === "in-transit" && (
-                                <button
-                                  onClick={() => {
-                                    const timestamp =
-                                      new Date().toLocaleString();
-                                    const updatedShipments =
-                                      inventory.shipments.map((s) =>
-                                        s.id === shipment.id
-                                          ? {
-                                              ...s,
-                                              status: "delivered",
-                                              deliveredAt: timestamp,
-                                            }
-                                          : s
-                                      );
-                                    const updatedInv = {
-                                      ...inventory,
-                                      shipments: updatedShipments,
-                                      logs: [
-                                        ...(inventory.logs || []),
-                                        {
-                                          timestamp,
-                                          action: `✅ Shipment #${shipment.id} delivered to ${shipment.destination}`,
-                                        },
-                                      ],
-                                    };
-                                    setInventory(updatedInv);
-                                    updateInventory(updatedInv);
-                                  }}
-                                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
-                                >
-                                  ✓ Delivered
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                          <button
-                            onClick={() => handleDeleteShipment(shipment.id)}
-                            className="text-red-600 text-sm hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {openDetails === shipment.id && (
-                      <tr className="bg-gray-50">
-                        <td colSpan={7} className="px-4 py-3">
-                          <div className="space-y-2 grid grid-cols-2 gap-4">
-                            <div>
-                              <p>
-                                <span className="font-semibold">
-                                  Shipment #:
-                                </span>{" "}
-                                {shipment.id}
-                              </p>
-                              <p>
-                                <span className="font-semibold">
-                                  Charge Batch #:
-                                </span>{" "}
-                                {shipment.chargeId}
-                              </p>
-                              <p>
-                                <span className="font-semibold">
-                                  Destination:
-                                </span>{" "}
-                                {shipment.destination}
-                              </p>
-                              <p>
-                                <span className="font-semibold">Status:</span>{" "}
-                                <span
-                                  className={`px-2 py-1 rounded text-sm font-medium inline-block ${getStatusBadgeClass(
-                                    shipment.status
-                                  )}`}
-                                >
-                                  {getStatusLabel(shipment.status)}
-                                </span>
-                              </p>
-                            </div>
-                            <div>
-                              <p>
-                                <span className="font-semibold">
-                                  Shipment Quantity:
-                                </span>{" "}
-                                {shipment.quantity}
-                              </p>
-                              <p>
-                                <span className="font-semibold">
-                                  Available Charged:
-                                </span>{" "}
-                                <span className="text-blue-600 font-semibold">
-                                  {getChargedCount(shipment.chargeId)}
-                                </span>
-                              </p>
-                              <p>
-                                <span className="font-semibold">Created:</span>{" "}
-                                {shipment.timestamp}
-                              </p>
-                              {shipment.shippedAt && (
-                                <p>
-                                  <span className="font-semibold">
-                                    Shipped:
-                                  </span>{" "}
-                                  {shipment.shippedAt}
-                                </p>
-                              )}
-                              {shipment.deliveredAt && (
-                                <p>
-                                  <span className="font-semibold">
-                                    Delivered:
-                                  </span>{" "}
-                                  {shipment.deliveredAt}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
+                      <button
+                        onClick={() => handleDeleteShipment(s.id)}
+                        className="text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="text-gray-500 italic">No shipments.</p>
         )}
       </section>
 
-      {/* Modal for add/edit shipment */}
+      {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0  flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white p-6 rounded shadow w-full max-w-sm sm:max-w-md">
             <h3 className="text-xl font-bold mb-4">
-              {editId ? "Edit" : "New"} Shipment
+              {editId ? "Edit Shipment" : "New Shipment"}
             </h3>
 
             <form onSubmit={handleSubmitShipment} className="space-y-4">
               <div>
-                <label htmlFor="chargeId" className="block font-medium mb-1">
-                  Charge Batch #
-                </label>
-                <select
-                  id="chargeId"
-                  name="chargeId"
-                  value={formData.chargeId}
-                  onChange={handleFormChange}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                >
-                  <option value="">-- Select --</option>
-                  {availableChargedBatteries.map((charge) => {
-                    const count =
-                      charge.actualChargedCount || charge.predictedOutput;
-                    return (
-                      <option key={charge.id} value={charge.id}>
-                        Batch #{charge.id} ({count} units available)
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {formData.chargeId && (
-                <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                  <p className="text-sm">
-                    <span className="font-semibold">Available Batteries:</span>
-                  </p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {getChargedCount(formData.chargeId)} units
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="destination" className="block font-medium mb-1">
-                  Destination
-                </label>
+                <label>Destination</label>
                 <input
-                  id="destination"
                   name="destination"
-                  type="text"
                   value={formData.destination}
                   onChange={handleFormChange}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                  placeholder="e.g., Warehouse A, City, etc."
+                  className="border p-2 rounded w-full"
                 />
               </div>
 
               <div>
-                <label htmlFor="quantity" className="block font-medium mb-1">
-                  Quantity to Ship
-                </label>
+                <label>Quantity</label>
                 <input
-                  id="quantity"
                   name="quantity"
                   type="number"
-                  min="1"
-                  max={
-                    formData.chargeId
-                      ? getChargedCount(formData.chargeId)
-                      : undefined
-                  }
                   value={formData.quantity}
                   onChange={handleFormChange}
-                  className={`border rounded px-3 py-2 w-full ${
-                    formData.quantity &&
-                    getChargedCount(formData.chargeId) &&
-                    parseFloat(formData.quantity) >
-                      getChargedCount(formData.chargeId)
-                      ? "border-red-500 bg-red-50"
-                      : "border-gray-300"
-                  }`}
-                  placeholder="Number of units"
-                  disabled={!formData.chargeId}
+                  className="border p-2 rounded w-full"
                 />
-                {formData.quantity &&
-                  getChargedCount(formData.chargeId) &&
-                  parseFloat(formData.quantity) >
-                    getChargedCount(formData.chargeId) && (
-                    <p className="text-xs text-red-600 mt-1">
-                      ⚠️ Cannot exceed {getChargedCount(formData.chargeId)}{" "}
-                      available units
-                    </p>
-                  )}
               </div>
 
               <div>
-                <label htmlFor="status" className="block font-medium mb-1">
-                  Status
-                </label>
+                <label>Shipment Time</label>
+                <input
+                  type="datetime-local"
+                  name="shipmentTime"
+                  value={formData.shipmentTime}
+                  onChange={handleFormChange}
+                  className="border p-2 rounded w-full"
+                />
+              </div>
+
+              <div>
+                <label>Status</label>
                 <select
-                  id="status"
                   name="status"
                   value={formData.status}
                   onChange={handleFormChange}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
+                  className="border p-2 rounded w-full"
                 >
                   <option value="packed">Packed</option>
                   <option value="shipped">Shipped</option>
@@ -638,27 +355,16 @@ const Shipment = () => {
                 </select>
               </div>
 
-              <div className="flex justify-end space-x-2 mt-6">
+              <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  className="px-4 py-2 bg-gray-300 rounded"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={
-                    !formData.chargeId ||
-                    !formData.destination ||
-                    !formData.quantity ||
-                    parseFloat(formData.quantity) <= 0 ||
-                    (formData.chargeId &&
-                      parseFloat(formData.quantity) >
-                        getChargedCount(formData.chargeId))
-                  }
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+
+                <button className="px-4 py-2 bg-blue-600 text-white rounded">
                   {editId ? "Update" : "Create"}
                 </button>
               </div>

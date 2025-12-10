@@ -1,733 +1,695 @@
 import React, { useState, useEffect } from "react";
 import { fetchInventory, updateInventory } from "../firebaseService";
 import Loader from "../components/Loader";
+import { toast } from "react-toastify";
 
 const Charging = () => {
   const [inventory, setInventory] = useState(null);
-  const [chargeInputs, setChargeInputs] = useState({});
-  const [openDetails, setOpenDetails] = useState(null);
-  const [showChargeModal, setShowChargeModal] = useState(false);
-  const [chargeFormData, setChargeFormData] = useState({
-    quantity: "",
-    startTime: "",
-    duration: "",
-    notes: "",
+  const [circuits, setCircuits] = useState([]);
+  const [editingCircuit, setEditingCircuit] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const [editFormData, setEditFormData] = useState({
+    circuitNo: null,
+    circuitStatus: "chargeable", // circuit-level: idle | chargeable | breakdown
+    status: "empty", // battery-level: running | empty | done
+    batteryCount: "",
+    putInDate: "",
+    prevBatteryCount: 0,
+    endTime: "",
   });
-  const [chargingFromBatch, setChargingFromBatch] = useState(null); // Track which batch to charge from
+
+  const pad = (n) => (n < 10 ? "0" + n : n);
+
+  const formatNowForDateTimeLocal = () => {
+    const d = new Date();
+    const YYYY = d.getFullYear();
+    const MM = pad(d.getMonth() + 1);
+    const DD = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mm = pad(d.getMinutes());
+    return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
+  };
+
+  const computeAvailableInventoryExcluding = (excludeCircuitNo) => {
+    // Total assigned batteries (excluding the given circuit)
+    const totalAssigned = circuits.reduce(
+      (sum, c) =>
+        sum +
+        (c.circuitNo !== excludeCircuitNo ? Number(c.batteryCount || 0) : 0),
+      0
+    );
+    // Available = inventory.finalProducts minus total assigned
+    return Math.max((inventory?.finalProducts || 0) - totalAssigned, 0);
+  };
+
+  const computeFinalMaxForCircuit = (circuitNo) => {
+    const circuit = circuits.find((c) => c.circuitNo === circuitNo);
+    const capacity = circuit?.batteryCapacity || 0;
+    const available = computeAvailableInventoryExcluding(circuitNo);
+    return Math.min(capacity, available);
+  };
+
+  const generateOrderId = (orders = []) => {
+    const next = (orders.length || 0) + 1;
+    return `ORD-${String(next).padStart(3, "0")}`;
+  };
 
   useEffect(() => {
     (async () => {
       try {
         const data = await fetchInventory();
         setInventory(data || {});
+        if (
+          data?.circuits &&
+          Array.isArray(data.circuits) &&
+          data.circuits.length === 6
+        ) {
+          setCircuits(
+            data.circuits.map((c, i) => ({
+              ...c,
+              circuitStatus: c.circuitStatus || "chargeable",
+              batteryCapacity: c.batteryCapacity || (i + 1 <= 4 ? 25 : 20),
+              batteryCount: Number(c.batteryCount || 0),
+            }))
+          );
+        } else {
+          const defaultCircuits = Array.from({ length: 6 }, (_, i) => ({
+            circuitNo: i + 1,
+            status: "empty",
+            circuitStatus: "chargeable",
+            batteryCount: 0,
+            putInDate: "",
+            lastUpdated: new Date().toLocaleString(),
+            batteryCapacity: i + 1 <= 4 ? 25 : 20,
+          }));
+          setCircuits(defaultCircuits);
+        }
       } catch (err) {
         console.error("Error fetching inventory:", err);
+        const fallbackCircuits = Array.from({ length: 6 }, (_, i) => ({
+          circuitNo: i + 1,
+          status: "empty",
+          circuitStatus: "chargeable",
+          batteryCount: 0,
+          putInDate: "",
+          lastUpdated: new Date().toLocaleString(),
+          batteryCapacity: i + 1 <= 4 ? 25 : 20,
+        }));
+        setCircuits(fallbackCircuits);
         setInventory({});
       }
     })();
   }, []);
 
-  // Get batteries from assembly orders that are completed
-  const getAvailableBatteries = () => {
-    return (inventory?.assemblyOrders || []).filter(
-      (order) => order.status === "completed" && !order.chargeStatus
-    );
-  };
+  const handleOpenEditModal = (circuitNo) => {
+    const circuit = circuits.find((c) => c.circuitNo === circuitNo);
+    if (!circuit) return;
 
-  // Get charged batteries (tracking)
-  const getChargedBatteries = () => {
-    return (inventory?.chargedBatteries || []).slice().reverse();
-  };
-
-  const handleStartCharging = (assemblyOrderId) => {
-    const order = inventory.assemblyOrders.find(
-      (o) => o.id === assemblyOrderId
-    );
-    if (!order) return;
-
-    const confirmCharge = window.confirm(
-      `Start charging battery batch from Assembly Order #${assemblyOrderId}?\n\nBatteries: ${
-        order.actualOutput || order.predictedOutput
-      }\n\nProceed?`
-    );
-    if (!confirmCharge) return;
-
-    const timestamp = new Date().toLocaleString();
-    const chargeRecord = {
-      id: (inventory?.chargedBatteries?.length || 0) + 1,
-      assemblyOrderId,
-      predictedOutput: order.actualOutput || order.predictedOutput,
-      status: "charging",
-      timestamp,
-      actualChargedCount: null,
-    };
-
-    const updatedBatteries = [
-      ...(inventory?.chargedBatteries || []),
-      chargeRecord,
-    ];
-    const updatedAssembly = inventory.assemblyOrders.map((o) =>
-      o.id === assemblyOrderId ? { ...o, chargeStatus: "in-progress" } : o
-    );
-
-    const updatedInv = {
-      ...inventory,
-      chargedBatteries: updatedBatteries,
-      assemblyOrders: updatedAssembly,
-      logs: [
-        ...(inventory.logs || []),
-        {
-          timestamp,
-          action: `🔌 Charging started for Battery Batch #${chargeRecord.id} from Assembly #${assemblyOrderId}`,
-        },
-      ],
-    };
-
-    setInventory(updatedInv);
-    updateInventory(updatedInv).catch((err) =>
-      console.error("Firebase update failed:", err)
-    );
-  };
-
-  // const handleOpenChargeModal = (assemblyOrderId = null) => {
-  //   setChargingFromBatch(assemblyOrderId);
-  //   setChargeFormData({ quantity: "", startTime: "", duration: "", notes: "" });
-  //   setShowChargeModal(true);
-  // };
-
-  const handleOpenChargeModal = (assemblyOrderId = null) => {
-    let maxQty = null;
-
-    if (assemblyOrderId) {
-      const order = inventory.assemblyOrders.find(
-        (o) => o.id === assemblyOrderId
-      );
-      maxQty = order?.actualOutput || order?.predictedOutput || null;
-    }
-
-    setChargingFromBatch(assemblyOrderId);
-
-    setChargeFormData({
-      quantity: "",
-      startTime: "",
-      duration: "",
-      notes: "",
-      maxQty, // ✅ store max available batteries
+    setEditingCircuit(circuitNo);
+    setEditFormData({
+      circuitNo,
+      circuitStatus: circuit.circuitStatus || "chargeable",
+      status: circuit.status || "empty",
+      batteryCount: circuit.batteryCount,
+      putInDate: circuit.putInDate || "",
+      prevBatteryCount: Number(circuit.batteryCount || 0),
+      endTime: "",
     });
 
-    setShowChargeModal(true);
+    setShowEditModal(true);
   };
 
-  const handleCloseChargeModal = () => {
-    setShowChargeModal(false);
-    setChargingFromBatch(null);
-    setChargeFormData({ quantity: "", startTime: "", duration: "", notes: "" });
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingCircuit(null);
+    setEditFormData({
+      circuitNo: null,
+      circuitStatus: "chargeable",
+      status: "empty",
+      batteryCount: "",
+      putInDate: "",
+      prevBatteryCount: 0,
+      endTime: "",
+    });
   };
 
-  const handleChargeFormChange = (e) => {
+  const handleEditFormChange = (e) => {
     const { name, value } = e.target;
-    setChargeFormData((prev) => ({ ...prev, [name]: value }));
+
+    // circuitStatus change only stored; applied on save
+    if (name === "circuitStatus") {
+      setEditFormData((prev) => ({ ...prev, circuitStatus: value }));
+      return;
+    }
+
+    // battery-level status logic (auto-fill putInDate when running)
+    if (name === "status") {
+      const newStatus = value;
+      setEditFormData((prev) => {
+        let finalStatus = newStatus;
+        if (newStatus === "empty" && Number(prev.batteryCount || 0) === 0) {
+          finalStatus = "done";
+        }
+        const shouldAutoFill =
+          finalStatus === "running" &&
+          (!prev.putInDate || prev.putInDate === "");
+        return {
+          ...prev,
+          status: finalStatus,
+          putInDate: shouldAutoFill
+            ? formatNowForDateTimeLocal()
+            : prev.putInDate,
+        };
+      });
+      return;
+    }
+
+    setEditFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmitCharge = async (e) => {
-    e.preventDefault();
+  const handleBatteryCountChange = (rawValue) => {
+    let val = parseInt(rawValue, 10);
+    if (Number.isNaN(val)) val = 0;
 
-    const qty = parseFloat(chargeFormData.quantity);
-    if (isNaN(qty) || qty <= 0) {
-      alert("Please enter a valid quantity");
+    const circuitNo = editFormData.circuitNo;
+    if (!circuitNo) {
+      setEditFormData((prev) => ({ ...prev, batteryCount: val }));
       return;
     }
 
-    if (!chargeFormData.startTime || !chargeFormData.duration) {
-      alert("Please fill in Start Time and Duration");
+    const finalMax = computeFinalMaxForCircuit(circuitNo);
+    if (val > finalMax) val = finalMax;
+    if (val < 0) val = 0;
+
+    setEditFormData((prev) => {
+      let nextStatus = prev.status;
+      if (val === 0 && prev.status === "empty") nextStatus = "done";
+      return { ...prev, batteryCount: val, status: nextStatus };
+    });
+  };
+
+  /**
+   * handleSaveCircuit
+   *
+   * Rules implemented:
+   * - If battery-level status === 'done':
+   *    * create order, reduce inventory.finalProducts by prev assigned count
+   *    * set circuit.circuitStatus => 'idle'
+   *    * set circuit.status => 'empty' (battery-level), batteryCount => 0, putInDate => ""
+   *
+   * - Else if circuitStatus is set to 'idle' or 'breakdown' explicitly:
+   *    * return previously assigned batteries back to inventory.finalProducts (so they are not lost)
+   *    * set circuit.status => 'empty', batteryCount => 0, putInDate => ""
+   *
+   * - Else (chargeable + not done):
+   *    * apply battery-level updates (status, batteryCount, putInDate) normally
+   */
+  const handleSaveCircuit = async () => {
+    if (!editFormData.circuitNo) return;
+
+    // parse batteryCount safely
+    const batteryCount = parseInt(editFormData.batteryCount || 0, 10);
+    if (isNaN(batteryCount) || batteryCount < 0) {
+      toast.error("Please enter a valid battery count");
       return;
     }
 
-    const confirmCharge = window.confirm(
-      `Start charging?\n\nQuantity: ${qty} batteries\nStart Time: ${
-        chargeFormData.startTime
-      }\nDuration: ${chargeFormData.duration} hours\nNotes: ${
-        chargeFormData.notes || "None"
-      }\n\nProceed?`
-    );
-    if (!confirmCharge) return;
+    const finalMax = computeFinalMaxForCircuit(editFormData.circuitNo);
+    const clampedBatteryCount = Math.min(batteryCount, finalMax);
 
-    const timestamp = new Date().toLocaleString();
-    const endTime = calculateEndTime(
-      chargeFormData.startTime,
-      chargeFormData.duration
-    );
+    let putInDate = editFormData.putInDate;
+    if (
+      (!putInDate || putInDate === "") &&
+      (clampedBatteryCount > 0 || editFormData.status === "running")
+    ) {
+      putInDate = formatNowForDateTimeLocal();
+    }
 
-    const chargeRecord = {
-      id: (inventory?.chargedBatteries?.length || 0) + 1,
-      assemblyOrderId: chargingFromBatch || null,
-      quantity: qty,
-      predictedOutput: qty,
-      status: "charging",
-      timestamp,
-      startTime: chargeFormData.startTime,
-      duration: chargeFormData.duration,
-      endTime,
-      notes: chargeFormData.notes,
-      actualChargedCount: null,
-    };
+    if (
+      editFormData.status === "done" &&
+      (!editFormData.endTime || editFormData.endTime === "")
+    ) {
+      toast.error("End Time is required when status is 'done'");
+      return;
+    }
 
-    const updatedBatteries = [
-      ...(inventory?.chargedBatteries || []),
-      chargeRecord,
+    const newOrders = inventory?.orders ? [...inventory.orders] : [];
+    let updatedInv = { ...inventory };
+    let updatedCircuits = circuits.map((c) => {
+      if (c.circuitNo !== editFormData.circuitNo) return c;
+
+      const prevCount = Number(c.batteryCount || 0);
+
+      // 1) If battery-level status is 'done' -> perform done flow
+      if (editFormData.status === "done") {
+        // reduce inventory by previously assigned count (prevCount)
+        updatedInv.finalProducts = Math.max(
+          (updatedInv.finalProducts || 0) - prevCount,
+          0
+        );
+
+        // create order (same behavior as previous)
+        const orderId = generateOrderId(newOrders);
+        const startTime = c.putInDate || "";
+        const endTime = editFormData.endTime;
+        let durationHours = 0;
+        try {
+          const s = startTime ? new Date(startTime) : null;
+          const e = new Date(endTime);
+          if (s && !isNaN(s) && !isNaN(e)) {
+            const diffMs = e.getTime() - s.getTime();
+            durationHours = Math.max(0, Number((diffMs / 3600000).toFixed(2)));
+          }
+        } catch {}
+        const order = {
+          orderId,
+          circuitNo: editFormData.circuitNo,
+          startTime,
+          endTime,
+          quantity: prevCount,
+          durationHours,
+          status: "done",
+        };
+        newOrders.unshift(order);
+
+        // set circuitStatus => idle (as requested), battery-level becomes empty, batteryCount cleared
+        return {
+          ...c,
+          circuitStatus: "idle",
+          status: "empty",
+          batteryCount: 0,
+          putInDate: "",
+          lastUpdated: new Date().toLocaleString(),
+        };
+      }
+
+      // 2) If user explicitly set circuitStatus to idle or breakdown -> wipe assignment and return batteries to inventory
+      if (
+        editFormData.circuitStatus === "idle" ||
+        editFormData.circuitStatus === "breakdown"
+      ) {
+        // Return previously assigned batteries back to inventory.finalProducts
+        updatedInv.finalProducts = Math.max(
+          (updatedInv.finalProducts || 0) + prevCount,
+          0
+        );
+
+        return {
+          ...c,
+          circuitStatus: editFormData.circuitStatus,
+          status: "empty",
+          batteryCount: 0,
+          putInDate: "",
+          lastUpdated: new Date().toLocaleString(),
+        };
+      }
+
+      // 3) Otherwise (chargeable and not done) apply battery-level updates normally
+      return {
+        ...c,
+        circuitStatus:
+          editFormData.circuitStatus || c.circuitStatus || "chargeable",
+        status: editFormData.status,
+        batteryCount: clampedBatteryCount,
+        putInDate:
+          editFormData.status === "running" || clampedBatteryCount > 0
+            ? putInDate
+            : c.putInDate,
+        lastUpdated: new Date().toLocaleString(),
+      };
+    });
+
+    // Update inventory fields
+    updatedInv.circuits = updatedCircuits;
+    updatedInv.orders = newOrders;
+    updatedInv.logs = [
+      ...(inventory?.logs || []),
+      {
+        timestamp: new Date().toLocaleString(),
+        action: `⚡ Circuit #${editFormData.circuitNo} updated: CircuitStatus=${editFormData.circuitStatus}, BatteryStatus=${editFormData.status}, Batteries=${clampedBatteryCount}`,
+      },
     ];
 
-    // If charging from a batch, mark that batch as in-progress
-    let updatedAssembly = inventory.assemblyOrders || [];
-    if (chargingFromBatch) {
-      updatedAssembly = inventory.assemblyOrders.map((o) =>
-        o.id === chargingFromBatch ? { ...o, chargeStatus: "in-progress" } : o
-      );
+    // Update local state first (optimistic)
+    setCircuits(updatedCircuits);
+    setInventory(updatedInv);
+
+    try {
+      await updateInventory(updatedInv);
+      toast.success(`Circuit #${editFormData.circuitNo} updated`);
+    } catch (err) {
+      toast.error(`Failed to update circuit: ${err.message}`);
+      console.error(err);
     }
 
-    const updatedInv = {
-      ...inventory,
-      chargedBatteries: updatedBatteries,
-      assemblyOrders: updatedAssembly,
-      logs: [
-        ...(inventory.logs || []),
-        {
-          timestamp,
-          action: `🔌 Charging started - Batch #${
-            chargeRecord.id
-          }: ${qty} batteries (${chargeFormData.startTime}, ${
-            chargeFormData.duration
-          }h)${
-            chargingFromBatch ? ` from Assembly #${chargingFromBatch}` : ""
-          }`,
-        },
-      ],
-    };
-
-    setInventory(updatedInv);
-    await updateInventory(updatedInv);
-    handleCloseChargeModal();
+    handleCloseEditModal();
   };
 
-  const calculateEndTime = (startTime, duration) => {
-    const [hours, minutes] = startTime.split(":").map(Number);
-    const durationHours = parseFloat(duration);
-    const totalMinutes = hours * 60 + minutes + durationHours * 60;
-    const endHours = Math.floor((totalMinutes / 60) % 24);
-    const endMinutes = totalMinutes % 60;
-    return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(
-      2,
-      "0"
-    )}`;
-  };
-
-  const handleChargeInputChange = (chargeId, value) => {
-    setChargeInputs({
-      ...chargeInputs,
-      [chargeId]: parseFloat(value) || "",
-    });
-  };
-
-  const handleCompleteCharging = async (chargeId) => {
-    if (!inventory) return;
-
-    const chargeRecord = inventory.chargedBatteries.find(
-      (c) => c.id === chargeId
-    );
-    if (!chargeRecord) return;
-
-    const actual = chargeInputs[chargeId] || 0;
-
-    const confirmDone = window.confirm(
-      `Mark Charge Batch #${chargeId} as completed?\n\nPredicted: ${chargeRecord.predictedOutput}\nActual Charged: ${actual}\n\nProceed?`
-    );
-    if (!confirmDone) return;
-
-    const timestamp = new Date().toLocaleString();
-    const updatedBatteries = inventory.chargedBatteries.map((c) =>
-      c.id === chargeId
-        ? { ...c, status: "completed", actualChargedCount: actual }
-        : c
-    );
-
-    const logs = [...(inventory.logs || [])];
-    if (actual !== chargeRecord.predictedOutput) {
-      logs.push({
-        timestamp,
-        logType: "discrepency",
-        action: `⚠️ Charge discrepancy Batch #${chargeId}: Predicted ${chargeRecord.predictedOutput}, Actual ${actual}`,
-      });
+  const getCircuitBadgeClass = (circuitStatus) => {
+    switch (circuitStatus) {
+      case "idle":
+        return "bg-gray-200 text-gray-700";
+      case "chargeable":
+        return "bg-blue-100 text-blue-800";
+      case "breakdown":
+        return "bg-red-200 text-red-900";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
-    logs.push({
-      timestamp,
-      action: `✅ Charging completed for Batch #${chargeId}`,
-    });
-
-    const updatedInv = {
-      ...inventory,
-      chargedBatteries: updatedBatteries,
-      logs,
-    };
-
-    setInventory(updatedInv);
-    await updateInventory(updatedInv);
-
-    setChargeInputs((prev) => {
-      const copy = { ...prev };
-      delete copy[chargeId];
-      return copy;
-    });
   };
 
-  if (!inventory) return <Loader />;
+  const getBatteryBadgeClass = (status) => {
+    switch (status) {
+      case "running":
+        return "bg-blue-100 text-blue-800";
+      case "empty":
+        return "bg-gray-100 text-gray-800";
+      case "breakdown":
+        return "bg-red-100 text-red-800";
+      case "done":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
-  const availableBatteries = getAvailableBatteries();
-  const chargedBatteries = getChargedBatteries();
+  if (!inventory || circuits.length === 0) return <Loader />;
 
   return (
-    <div className="max-w-5xl mx-auto p-4 space-y-8">
+    <div className="max-w-6xl mx-auto p-4 space-y-8">
       <h2 className="text-3xl font-bold text-center mb-6">
-        🔌 Battery Charging
+        🔌 Battery Charging - Circuits Management
       </h2>
 
-      {/* Start New Charging Session Button */}
-      <div className="flex justify-center mb-6">
-        <button
-          onClick={() => handleOpenChargeModal()}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold"
-        >
-          ⚡ Start New Charging Session
-        </button>
-      </div>
+      {/* Summary */}
+      <section>
+        <h3 className="text-xl font-semibold mb-4">📊 Summary</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          {/* Running */}
+          <div className="bg-blue-50 border border-blue-200 rounded p-4 text-center">
+            <p className="text-gray-600 text-sm">Running</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {circuits.filter((c) => c.status === "running").length}
+            </p>
+          </div>
 
-      {availableBatteries.length > 0 && (
-        <section>
-          <h3 className="text-xl font-semibold mb-4">📦 Available Batteries</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200 rounded">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="text-left px-4 py-2">Assembly Order #</th>
-                  <th className="text-left px-4 py-2">Battery Count</th>
-                  <th className="text-left px-4 py-2">Date</th>
-                  <th className="text-left px-4 py-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {availableBatteries.map((order) => (
-                  <tr key={order.id} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3">#{order.id}</td>
-                    <td className="px-4 py-3">
-                      {order.actualOutput || order.predictedOutput}
+          {/* Empty */}
+          <div className="bg-gray-50 border border-gray-200 rounded p-4 text-center">
+            <p className="text-gray-600 text-sm">Empty</p>
+            <p className="text-2xl font-bold text-gray-600">
+              {circuits.filter((c) => c.status === "empty").length}
+            </p>
+          </div>
+
+          {/* Breakdown */}
+          <div className="bg-red-50 border border-red-200 rounded p-4 text-center">
+            <p className="text-gray-600 text-sm">Breakdown</p>
+            <p className="text-2xl font-bold text-red-600">
+              {circuits.filter((c) => c.circuitStatus === "breakdown").length}
+            </p>
+          </div>
+
+          {/* Total Batteries in CURRENT circuits */}
+          <div className="bg-green-50 border border-green-200 rounded p-4 text-center">
+            <p className="text-gray-600 text-sm">Total Batteries</p>
+            <p className="text-2xl font-bold text-green-600">
+              {circuits.reduce(
+                (sum, c) =>
+                  sum +
+                  (c.status !== "empty" ? Number(c.batteryCount || 0) : 0),
+                0
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Circuits Table */}
+      <section>
+        <h3 className="text-xl font-semibold mb-4">⚡ Circuits (1–6)</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white border border-gray-200 rounded">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="text-left px-4 py-2 border-b">Circuit No</th>
+                <th className="text-left px-4 py-2 border-b">
+                  Battery Capacity
+                </th>
+                <th className="text-left px-4 py-2 border-b">Circuit Status</th>
+                <th className="text-left px-4 py-2 border-b">Battery Count</th>
+                <th className="text-left px-4 py-2 border-b">Put-in Date</th>
+                <th className="text-left px-4 py-2 border-b">Last Updated</th>
+                <th className="text-left px-4 py-2 border-b">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {circuits.map((circuit) => {
+                const isChargeable = circuit.circuitStatus === "chargeable";
+                const isBreakdown = circuit.circuitStatus === "breakdown";
+                return (
+                  <tr
+                    key={circuit.circuitNo}
+                    className={`border-t hover:bg-gray-50 ${
+                      isBreakdown ? "bg-red-50" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3 font-semibold">
+                      #{circuit.circuitNo}
                     </td>
-                    <td className="px-4 py-3">{order.timestamp}</td>
+
+                    {/* Battery Capacity always visible */}
+                    <td className="px-4 py-3 text-center">
+                      {circuit.batteryCapacity}
+                    </td>
+
+                    {/* Circuit Status badge */}
+                    <td className="px-4 py-2">
+                      {circuit.circuitStatus === "chargeable"
+                        ? `Chargeable (${circuit.status || "empty"})`
+                        : circuit.circuitStatus.charAt(0).toUpperCase() +
+                          circuit.circuitStatus.slice(1)}
+                    </td>
+
+                    {/* Battery Count: show dash unless chargeable */}
+                    <td className="px-4 py-3 text-center">
+                      {isChargeable ? circuit.batteryCount : "—"}
+                    </td>
+
+                    {/* Put-in Date */}
+                    <td className="px-4 py-3">
+                      {isChargeable ? circuit.putInDate || "-" : "—"}
+                    </td>
+
+                    {/* Last Updated */}
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {isChargeable ? circuit.lastUpdated || "-" : "—"}
+                    </td>
+
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => handleOpenChargeModal(order.id)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                        onClick={() => handleOpenEditModal(circuit.circuitNo)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
                       >
-                        Start Charging
+                        Edit
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      <section>
-        <h3 className="text-xl font-semibold mt-10 mb-4">
-          ⚡ Charging Batches
-        </h3>
-        {chargedBatteries.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200 rounded">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="text-left px-4 py-2">Batch #</th>
-                  <th className="text-left px-4 py-2">From Assembly #</th>
-                  <th className="text-left px-4 py-2">Status</th>
-                  <th className="text-left px-4 py-2">
-                    Charged (Predicted / Actual)
-                  </th>
-                  <th className="text-left px-4 py-2">Date</th>
-                  <th className="text-left px-4 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {chargedBatteries.map((charge) => {
-                  const statusLabel =
-                    charge.status === "charging" ? "In Progress" : "Completed";
-                  const predNum = Number(charge.predictedOutput) || 0;
-                  const actNum =
-                    charge.actualChargedCount ??
-                    chargeInputs[charge.id] ??
-                    null;
-                  const actNum_ = actNum != null ? Number(actNum) || 0 : null;
-
-                  let outputClass = "text-gray-700";
-                  if (actNum_ != null) {
-                    if (predNum < actNum_)
-                      outputClass = "text-red-600 font-semibold";
-                    else if (predNum === actNum_)
-                      outputClass = "text-green-600 font-semibold";
-                  }
-
-                  return (
-                    <React.Fragment key={charge.id}>
-                      <tr className="border-t hover:bg-gray-50">
-                        <td className="px-4 py-3">#{charge.id}</td>
-                        <td className="px-4 py-3">#{charge.assemblyOrderId}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`px-2 py-1 rounded text-sm font-medium ${
-                              charge.status === "charging"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {statusLabel}
-                          </span>
-                        </td>
-                        <td className={`px-4 py-3 ${outputClass}`}>
-                          {charge.predictedOutput} /{" "}
-                          {charge.actualChargedCount ??
-                            chargeInputs[charge.id] ??
-                            "-"}
-                        </td>
-                        <td className="px-4 py-3">{charge.timestamp}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() =>
-                                setOpenDetails((prev) =>
-                                  prev === charge.id ? null : charge.id
-                                )
-                              }
-                              className="text-sm text-blue-600 hover:underline"
-                            >
-                              View Details
-                            </button>
-
-                            {charge.status === "charging" && (
-                              <>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={charge.predictedOutput}
-                                  step="any"
-                                  value={chargeInputs[charge.id] ?? ""}
-                                  onChange={(e) =>
-                                    handleChargeInputChange(
-                                      charge.id,
-                                      e.target.value
-                                    )
-                                  }
-                                  className={`border rounded px-2 py-1 w-20 ${
-                                    chargeInputs[charge.id] != null &&
-                                    chargeInputs[charge.id] >
-                                      charge.predictedOutput
-                                      ? "border-red-500 bg-red-50"
-                                      : "border-gray-300"
-                                  }`}
-                                  placeholder="Actual"
-                                  title={`Cannot exceed ${charge.predictedOutput}`}
-                                />
-                                {chargeInputs[charge.id] != null &&
-                                  chargeInputs[charge.id] >
-                                    charge.predictedOutput && (
-                                    <span className="text-xs text-red-600">
-                                      ⚠️ Exceeds quantity
-                                    </span>
-                                  )}
-                                <button
-                                  onClick={() =>
-                                    handleCompleteCharging(charge.id)
-                                  }
-                                  disabled={
-                                    chargeInputs[charge.id] == null ||
-                                    chargeInputs[charge.id] < 0 ||
-                                    chargeInputs[charge.id] >
-                                      charge.predictedOutput
-                                  }
-                                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
-                                  title={
-                                    chargeInputs[charge.id] >
-                                    charge.predictedOutput
-                                      ? "Actual count cannot exceed predicted"
-                                      : ""
-                                  }
-                                >
-                                  Mark Done
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-
-                      {openDetails === charge.id && (
-                        <tr className="bg-gray-50">
-                          <td colSpan={6} className="px-4 py-3">
-                            <div className="space-y-2 grid grid-cols-2 gap-4">
-                              <div>
-                                <p>
-                                  <span className="font-semibold">
-                                    From Assembly Order #:
-                                  </span>{" "}
-                                  {charge.assemblyOrderId || "Manual"}
-                                </p>
-                                <p>
-                                  <span className="font-semibold">
-                                    Batch Started:
-                                  </span>{" "}
-                                  {charge.timestamp}
-                                </p>
-                                <p>
-                                  <span className="font-semibold">Status:</span>{" "}
-                                  {statusLabel}
-                                </p>
-                              </div>
-                              <div>
-                                <p>
-                                  <span className="font-semibold">
-                                    Quantity:
-                                  </span>{" "}
-                                  {charge.quantity || charge.predictedOutput}
-                                </p>
-                                {charge.startTime && (
-                                  <>
-                                    <p>
-                                      <span className="font-semibold">
-                                        Start Time:
-                                      </span>{" "}
-                                      {charge.startTime}
-                                    </p>
-                                    <p>
-                                      <span className="font-semibold">
-                                        Duration:
-                                      </span>{" "}
-                                      {charge.duration}h
-                                    </p>
-                                    <p>
-                                      <span className="font-semibold">
-                                        End Time:
-                                      </span>{" "}
-                                      {charge.endTime}
-                                    </p>
-                                  </>
-                                )}
-                                {charge.notes && (
-                                  <p>
-                                    <span className="font-semibold">
-                                      Notes:
-                                    </span>{" "}
-                                    {charge.notes}
-                                  </p>
-                                )}
-                              </div>
-                              {charge.status === "completed" && (
-                                <div className="col-span-2 mt-2 p-2 bg-blue-50 rounded">
-                                  <p>
-                                    <span className="font-semibold">
-                                      Predicted:
-                                    </span>{" "}
-                                    {charge.predictedOutput}
-                                  </p>
-                                  <p>
-                                    <span className="font-semibold">
-                                      Actual Charged:
-                                    </span>{" "}
-                                    <span
-                                      className={`font-semibold ${
-                                        charge.actualChargedCount ===
-                                        charge.predictedOutput
-                                          ? "text-green-600"
-                                          : "text-orange-600"
-                                      }`}
-                                    >
-                                      {charge.actualChargedCount}
-                                    </span>
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-gray-500 italic">No charging batches.</p>
-        )}
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      {/* Charging Modal */}
-      {showChargeModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
+      {/* Charging Orders Table */}
+      <section>
+        <h3 className="text-xl font-semibold mt-8 mb-4">
+          📦 Charging Orders (Completed)
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white border border-gray-200 rounded">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="text-left px-4 py-2 border-b">Order ID</th>
+                <th className="text-left px-4 py-2 border-b">Circuit No</th>
+                <th className="text-left px-4 py-2 border-b">Start Time</th>
+                <th className="text-left px-4 py-2 border-b">End Time</th>
+                <th className="text-left px-4 py-2 border-b">Quantity</th>
+                <th className="text-left px-4 py-2 border-b">Duration (hrs)</th>
+                <th className="text-left px-4 py-2 border-b">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(inventory?.orders || []).map((o) => (
+                <tr key={o.orderId} className="border-t hover:bg-gray-50">
+                  <td className="px-4 py-3 font-semibold">{o.orderId}</td>
+                  <td className="px-4 py-3">#{o.circuitNo}</td>
+                  <td className="px-4 py-3 text-sm">{o.startTime || "-"}</td>
+                  <td className="px-4 py-3 text-sm">{o.endTime || "-"}</td>
+                  <td className="px-4 py-3 text-center">{o.quantity}</td>
+                  <td className="px-4 py-3 text-center">{o.durationHours}</td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-1 rounded text-sm font-medium bg-green-50 text-green-800">
+                      {o.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {(!inventory?.orders || inventory.orders.length === 0) && (
+                <tr>
+                  <td className="px-4 py-3 text-sm text-gray-500" colSpan={7}>
+                    No completed orders yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h4 className="text-lg font-semibold mb-2">
+          🔋 Total Batteries Charged
+        </h4>
+        <p className="text-xl font-bold">
+          {(inventory?.orders || []).reduce(
+            (sum, o) => sum + (o.quantity || 0),
+            0
+          )}
+        </p>
+      </section>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg max-h-screen overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">
-              ⚡ Start Charging Session
+              ⚡ Edit Circuit #{editFormData.circuitNo}
             </h3>
-
-            <form onSubmit={handleSubmitCharge} className="space-y-4">
-              {/* Quantity */}
+            <div className="space-y-4">
+              {/* Circuit-level status */}
               <div>
-                <label htmlFor="quantity" className="block font-medium mb-1">
-                  Number of Batteries to Charge
-                </label>
-                {/* <input
-                  id="quantity"
-                  name="quantity"
-                  type="number"
-                  min="1"
-                  step="any"
-                  value={chargeFormData.quantity}
-                  onChange={handleChargeFormChange}
+                <label className="block font-medium mb-1">Circuit Status</label>
+                <select
+                  name="circuitStatus"
+                  value={editFormData.circuitStatus}
+                  onChange={handleEditFormChange}
                   className="border border-gray-300 rounded px-3 py-2 w-full"
-                  placeholder="e.g., 50"
-                  required
-                /> */}
-
-                <input
-                  id="quantity"
-                  name="quantity"
-                  type="number"
-                  min="1"
-                  step="any"
-                  max={chargeFormData.maxQty || undefined}
-                  value={chargeFormData.quantity}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (val <= (chargeFormData.maxQty || Infinity)) {
-                      setChargeFormData((prev) => ({ ...prev, quantity: val }));
-                    }
-                  }}
-                  className={`border border-gray-300 rounded px-3 py-2 w-full ${
-                    chargeFormData.quantity > chargeFormData.maxQty
-                      ? "border-black-500 "
-                      : ""
-                  }`}
-                  placeholder={
-                    chargeFormData.maxQty
-                      ? `Max: ${chargeFormData.maxQty}`
-                      : "e.g., 50"
-                  }
-                  required
-                />
+                >
+                  <option value="idle">Idle</option>
+                  <option value="chargeable">Chargeable</option>
+                  <option value="breakdown">Breakdown</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Idle / Breakdown will clear the assigned batteries
+                  (batteryCount → 0).
+                </p>
               </div>
+              {!(
+                editFormData.circuitStatus === "idle" ||
+                editFormData.circuitStatus === "breakdown"
+              ) && (
+                <>
+                  {/* Battery-level status */}
+                  <div>
+                    <label className="block font-medium mb-1">
+                      Battery Status
+                    </label>
+                    <select
+                      name="status"
+                      value={editFormData.status}
+                      onChange={handleEditFormChange}
+                      className="border border-gray-300 rounded px-3 py-2 w-full"
+                    >
+                      <option value="running">Running</option>
+                      <option value="empty">Empty</option>
+                      <option value="done">Done</option>
+                    </select>
+                  </div>
 
-              {/* Start Time */}
-              <div>
-                <label htmlFor="startTime" className="block font-medium mb-1">
-                  Start Time
-                </label>
-                <input
-                  id="startTime"
-                  name="startTime"
-                  type="time"
-                  value={chargeFormData.startTime}
-                  onChange={handleChargeFormChange}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                  required
-                />
-              </div>
+                  {/* Hide Battery Count when status = empty */}
+                  {editFormData.status !== "empty" && (
+                    <div>
+                      <label className="block font-medium mb-1">
+                        Battery Count (Available:{" "}
+                        {computeAvailableInventoryExcluding(
+                          editFormData.circuitNo
+                        )}
+                        )
+                      </label>
 
-              {/* Duration */}
-              <div>
-                <label htmlFor="duration" className="block font-medium mb-1">
-                  Duration (hours)
-                </label>
-                <input
-                  id="duration"
-                  name="duration"
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  value={chargeFormData.duration}
-                  onChange={handleChargeFormChange}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                  placeholder="e.g., 2"
-                  required
-                />
-              </div>
+                      <input
+                        type="number"
+                        name="batteryCount"
+                        min="0"
+                        max={computeFinalMaxForCircuit(editFormData.circuitNo)}
+                        value={editFormData.batteryCount}
+                        onChange={(e) =>
+                          handleBatteryCountChange(e.target.value)
+                        }
+                        className="border border-gray-300 rounded px-3 py-2 w-full"
+                      />
 
-              {/* Estimated End Time (Read-only) */}
-              {chargeFormData.startTime && chargeFormData.duration && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Max allowed:{" "}
+                        {computeFinalMaxForCircuit(editFormData.circuitNo)}
+                        (capacity:{" "}
+                        {circuits.find(
+                          (c) => c.circuitNo === editFormData.circuitNo
+                        )?.batteryCapacity || 0}
+                        )
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Hide Put-in Date when status = empty */}
+                  {editFormData.status !== "empty" && (
+                    <div>
+                      <label className="block font-medium mb-1">
+                        Put-in Date
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="putInDate"
+                        value={editFormData.putInDate}
+                        onChange={handleEditFormChange}
+                        className="border border-gray-300 rounded px-3 py-2 w-full"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* End Time only when status = done */}
+              {editFormData.status === "done" && (
                 <div>
-                  <label className="block font-medium mb-1">
-                    Estimated End Time
-                  </label>
+                  <label className="block font-medium mb-1">End Time</label>
                   <input
-                    type="time"
-                    value={calculateEndTime(
-                      chargeFormData.startTime,
-                      chargeFormData.duration
-                    )}
-                    disabled
-                    className="border border-gray-300 rounded px-3 py-2 w-full bg-gray-100"
+                    type="datetime-local"
+                    name="endTime"
+                    value={editFormData.endTime}
+                    onChange={handleEditFormChange}
+                    className="border border-gray-300 rounded px-3 py-2 w-full"
                   />
                 </div>
               )}
 
-              {/* Notes */}
-              <div>
-                <label htmlFor="notes" className="block font-medium mb-1">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  id="notes"
-                  name="notes"
-                  value={chargeFormData.notes}
-                  onChange={handleChargeFormChange}
-                  className="border border-gray-300 rounded px-3 py-2 w-full"
-                  rows="3"
-                  placeholder="e.g., temperature, charger status, etc."
-                />
-              </div>
-
-              {chargingFromBatch && (
-                <p className="text-sm text-blue-600">
-                  ℹ️ Charging from Assembly Order #{chargingFromBatch}
-                </p>
-              )}
-
               <div className="flex justify-end space-x-2 mt-6">
                 <button
-                  type="button"
-                  onClick={handleCloseChargeModal}
+                  onClick={handleCloseEditModal}
                   className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  onClick={handleSaveCircuit}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
-                  Start Charging
+                  Save
                 </button>
-                {/* <button
-                  type="submit"
-                  disabled={
-                    !chargeFormData.quantity ||
-                    chargeFormData.quantity > chargeFormData.maxQty
-                  }
-                  className={`px-4 py-2 rounded text-white ${
-                    chargeFormData.quantity > chargeFormData.maxQty
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  }`}
-                >
-                  Start Charging
-                </button> */}
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

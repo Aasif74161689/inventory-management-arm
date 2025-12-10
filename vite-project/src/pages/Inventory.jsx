@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
+// import BulkStockUpdateModal from "../components/BulkStockUpdateModal";
 import {
   fetchInventory,
   initInventory,
@@ -7,7 +7,11 @@ import {
 } from "../firebaseService";
 import Loader from "../components/Loader";
 import { toast } from "react-toastify";
-import BulkL2UpdateModal from "../components/BulkL2UpdateModal";
+import AddProductModal from "../components/AddProductModal";
+// import BulkL2UpdateModal from "../components/BulkL2UpdateModal";
+
+import BulkUpdateModal from "../components/BulkUpdateModal";
+import InventorySettingsSection from "../components/InventorySettingsSection";
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -17,8 +21,10 @@ const LOW_STOCK_THRESHOLD = 10;
 const Inventory = () => {
   const [inventory, setInventory] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false); // l1
-  const [modalOpens, setModalOpens] = useState(false); // l2
+  const [isL1Open, setIsL1Open] = useState(false); // l1
+  const [isL2Open, setIsL2Open] = useState(false); // l2
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddModalL2, setShowAddModalL2] = useState(false);
   const [activeTab, setActiveTab] = useState("l1"); // l1 | l2 | orders | logs
 
   const safeNumber = (val) => (isNaN(val) || val == null ? 0 : val);
@@ -56,115 +62,87 @@ const Inventory = () => {
           l1_component: [
             {
               productId: "PD-001",
-              productName: "Positive Jali",
-              category: "Lead Alloy",
+              productName: "Lead Alloy",
               unit: "KG",
               quantity: 250,
               minThreshold: 10,
             },
             {
               productId: "PD-002",
-              productName: "Negative Jali",
-              category: "Lead Alloy",
+              productName: "Gray Oxide",
               unit: "KG",
               quantity: 150,
               minThreshold: 10,
             },
             {
               productId: "PD-003",
-              productName: "Part Die",
-              category: "Lead Alloy",
+              productName: "Red Oxide",
               unit: "KG",
               quantity: 500,
               minThreshold: 5,
             },
             {
               productId: "PD-004",
-              productName: "Positive Filling",
-              category: "Oxide",
-              unit: "KG",
+              productName: "Tub Bags",
+              unit: "PCS",
               quantity: 300,
               minThreshold: 10,
             },
             {
               productId: "PD-005",
-              productName: "Negative Pasting",
-              category: "Oxide",
+              productName: "DM Water",
               unit: "KG",
               quantity: 320,
               minThreshold: 10,
             },
             {
               productId: "PD-006",
-              productName: "Positive Filling",
-              category: "Red Oxide",
+              productName: "Acid",
               unit: "KG",
               quantity: 100,
               minThreshold: 10,
             },
             {
               productId: "PD-007",
-              productName: "Berium",
-              category: "Chemical",
+              productName: "Carbon",
               unit: "KG",
               quantity: 50,
               minThreshold: 10,
             },
             {
               productId: "PD-008",
-              productName: "Carbon",
-              category: "Chemical",
+              productName: "Lignin",
               unit: "KG",
               quantity: 40,
               minThreshold: 10,
             },
             {
               productId: "PD-009",
-              productName: "Lignin",
-              category: "Chemical",
+              productName: "Sulphate",
               unit: "KG",
               quantity: 60,
               minThreshold: 10,
             },
             {
               productId: "PD-010",
-              productName: "Fibre",
-              category: "Chemical",
+              productName: "Fiber",
               unit: "KG",
               quantity: 80,
               minThreshold: 10,
             },
             {
               productId: "PD-011",
-              productName: "DM Water",
-              category: "Chemical",
-              unit: "LTR",
+              productName: "Bottom Bar",
+              unit: "PCS",
               quantity: 200,
               minThreshold: 10,
             },
             {
               productId: "PD-012",
-              productName: "Acid",
-              category: "Chemical",
-              unit: "LTR",
+              productName: "Raddi Paper",
+              unit: "KG",
               quantity: 150,
               minThreshold: 10,
-            },
-            {
-              productId: "PD-013",
-              productName: "Bag",
-              category: "Chemical",
-              unit: "PCS",
-              quantity: 100,
-              minThreshold: 5,
-            },
-            {
-              productId: "PD-014",
-              productName: "Bottom",
-              category: "Chemical",
-              unit: "PCS",
-              quantity: 100,
-              minThreshold: 5,
             },
           ],
           l2_component: [
@@ -286,34 +264,30 @@ const Inventory = () => {
           productionOrders: [],
           assemblyOrders: [],
           finalProducts: 0,
-          plateBOM: [
-            { productId: "PD-001", name: "Positive Jali", qty: 0.251 },
-            { productId: "PD-002", name: "Negative Jali", qty: 0.152 },
-            { productId: "PD-003", name: "Part Die", qty: 1.5 },
-            {
-              productId: "PD-004",
-              name: "Positive Filling (Oxide)",
-              qty: 0.258,
-            },
-            {
-              productId: "PD-005",
-              name: "Negative Pasting (Oxide)",
-              qty: 0.312,
-            },
-            {
-              productId: "PD-006",
-              name: "Positive Filling (Red Oxide)",
-              qty: 0.086,
-            },
-            { productId: "PD-007", name: "Berium", qty: 0.003125 },
-            { productId: "PD-008", name: "Carbon", qty: 0.00078125 },
-            { productId: "PD-009", name: "Lignin", qty: 0.0009375 },
-            { productId: "PD-010", name: "Fibre", qty: 0.000375 },
-            { productId: "PD-011", name: "DM Water", qty: 0.03125 },
-            { productId: "PD-012", name: "Acid", qty: 0.019375 },
-            { productId: "PD-013", name: "Bag", qty: 1 },
-            { productId: "PD-014", name: "Bottom", qty: 1 },
-          ],
+
+          plateBOM: {
+            positivePlateBOM: [
+              { productId: "PD-001", productName: "Lead Alloy", qty: 0.26 },
+              { productId: "PD-002", productName: "Gray Oxide", qty: 0.25 },
+              { productId: "PD-003", productName: "Red Oxide", qty: 0.084 },
+              { productId: "PD-004", productName: "Tub Bags", qty: 1 },
+              { productId: "PD-005", productName: "DM Water", qty: 0.315 },
+              { productId: "PD-006", productName: "Acid", qty: 0.07 },
+              { productId: "PD-011", productName: "Bottom Bar", qty: 1 },
+            ],
+
+            negativePlateBOM: [
+              { productId: "PD-001", productName: "Lead Alloy", qty: 0.166 },
+              { productId: "PD-002", productName: "Gray Oxide", qty: 0.304 },
+              { productId: "PD-005", productName: "DM Water", qty: 0.045 },
+              { productId: "PD-006", productName: "Acid", qty: 0.011 },
+              { productId: "PD-007", productName: "Carbon", qty: 0.001 },
+              { productId: "PD-008", productName: "Lignin", qty: 0.001 },
+              { productId: "PD-009", productName: "Sulphate", qty: 0.003 },
+              { productId: "PD-010", productName: "Fiber", qty: 0.0004 },
+              { productId: "PD-012", productName: "Raddi Paper", qty: 0.06 },
+            ],
+          },
         });
         data = await fetchInventory();
       }
@@ -324,6 +298,155 @@ const Inventory = () => {
   }, []);
 
   if (loading) return <Loader />;
+
+  const handleBOMUpdate = async (item, bomPath) => {
+    const currentBOM =
+      inventory.plateBOM[bomPath].find((i) => i.productId === item.productId)
+        ?.qty ?? 0;
+
+    const input = window.prompt(
+      `Enter new BOM qty for ${item.productName}:`,
+      currentBOM
+    );
+
+    if (!input) return;
+
+    const val = parseFloat(input);
+    if (isNaN(val) || val <= 0) return alert("Invalid number");
+
+    setInventory((prev) => {
+      const copy = { ...prev };
+
+      // Update qty
+      copy.plateBOM[bomPath] = copy.plateBOM[bomPath].map((i) =>
+        i.productId === item.productId ? { ...i, qty: val } : i
+      );
+
+      // ✅ Add log entry
+      const logEntry = {
+        timestamp: new Date().toLocaleString(),
+        action: `🔧 L1 BOM Updated (${bomPath}): ${item.productName} → ${val}`,
+        logType: "bom",
+      };
+
+      copy.logs = [...(prev.logs || []), logEntry];
+
+      updateInventory(copy);
+      return copy;
+    });
+
+    toast.success("BOM updated");
+  };
+
+  const handleThresholdUpdate = (productId, field, value) => {
+    setInventory((prev) => {
+      const copy = { ...prev };
+
+      copy.l1_component = copy.l1_component.map((item) =>
+        item.productId === productId
+          ? { ...item, [field]: Number(value) }
+          : item
+      );
+
+      // Find item for log message
+      const updatedItem = prev.l1_component.find(
+        (i) => i.productId === productId
+      );
+
+      // ✅ Add log entry
+      const logEntry = {
+        timestamp: new Date().toLocaleString(),
+        action: `⚠️ L1 Threshold Updated: ${updatedItem?.productName} → ${value}`,
+        logType: "threshold",
+      };
+
+      copy.logs = [...(prev.logs || []), logEntry];
+
+      updateInventory(copy);
+      return copy;
+    });
+  };
+
+  const handleBOMUpdateL2 = async (item) => {
+    const current =
+      inventory.inverterBOM.find((i) => i.productId === item.productId)?.qty ??
+      0;
+
+    const input = window.prompt(
+      `Enter new BOM qty for ${item.productName}:`,
+      current
+    );
+    if (!input) return;
+
+    const val = parseFloat(input);
+    if (isNaN(val) || val <= 0) return alert("Invalid value");
+
+    setInventory((prev) => {
+      const copy = { ...prev };
+
+      copy.inverterBOM = copy.inverterBOM.map((i) =>
+        i.productId === item.productId ? { ...i, qty: val } : i
+      );
+
+      // ✅ Add log entry
+      const logEntry = {
+        timestamp: new Date().toLocaleString(),
+        action: `🔧 L2 BOM Updated: ${item.productName} → ${val}`,
+        logType: "bom",
+      };
+
+      copy.logs = [...(prev.logs || []), logEntry];
+
+      updateInventory(copy);
+      return copy;
+    });
+
+    toast.success("L2 BOM updated");
+  };
+
+  // const handleThresholdUpdateL2 = (productId, field, value) => {
+  //   setInventory((prev) => {
+  //     const copy = { ...prev };
+
+  //     copy.l2_component = copy.l2_component.map((item) =>
+  //       item.productId === productId
+  //         ? { ...item, [field]: Number(value) }
+  //         : item
+  //     );
+
+  //     updateInventory(copy); // save to Firebase
+  //     return copy;
+  //   });
+  // };
+
+  const handleThresholdUpdateL2 = (productId, field, value) => {
+    setInventory((prev) => {
+      const copy = { ...prev };
+
+      copy.l2_component = copy.l2_component.map((item) =>
+        item.productId === productId
+          ? { ...item, [field]: Number(value) }
+          : item
+      );
+
+      // Find item name for log
+      const updatedItem = prev.l2_component.find(
+        (i) => i.productId === productId
+      );
+
+      // ✅ Add log entry
+      const logEntry = {
+        timestamp: new Date().toLocaleString(),
+        action: `⚠️ L2 Threshold Updated: ${updatedItem?.productName} → ${value}`,
+        logType: "threshold",
+      };
+
+      copy.logs = [...(prev.logs || []), logEntry];
+
+      updateInventory(copy);
+      return copy;
+    });
+  };
 
   if (!inventory)
     return (
@@ -340,16 +463,24 @@ const Inventory = () => {
       </div>
     );
 
-  // Non-invasive computed metric: Total L1 produced
-  // Sum actualOutput for completed orders, fallback to predictedOutput when actual is missing
-  const totalL1Produced = (inventory.productionOrders || [])
-    .filter((o) => o != null)
-    .reduce((sum, o) => {
-      // only count completed orders by default; if you prefer to count all, remove the filter
-      if (o.status && o.status !== "completed") return sum;
-      const val = Number(o.actualOutput ?? o.predictedOutput ?? 0);
-      return sum + (isNaN(val) ? 0 : val);
-    }, 0);
+  // Total Positive Plates produced
+  const totalPositiveProduced =
+    inventory.productionOrders
+      ?.filter(
+        (order) => order.bomType === "positive" && order.status === "completed"
+      )
+      .reduce((acc, order) => acc + (Number(order.actualOutput) || 0), 0) || 0;
+
+  // Total Negative Plates produced
+  const totalNegativeProduced =
+    inventory.productionOrders
+      ?.filter(
+        (order) => order.bomType === "negative" && order.status === "completed"
+      )
+      .reduce((acc, order) => acc + (Number(order.actualOutput) || 0), 0) || 0;
+
+  // Total Plates produced
+  const totalPlatesProduced = totalPositiveProduced + totalNegativeProduced;
 
   // ✅ Low Stock Calculations
   const lowStockL1 = (inventory.l1_component || []).filter(
@@ -362,6 +493,17 @@ const Inventory = () => {
 
   const totalLowStock = lowStockL1 + lowStockL2;
 
+  const positiveBOM = inventory?.plateBOM?.positivePlateBOM || [];
+  const negativeBOM = inventory?.plateBOM?.negativePlateBOM || [];
+
+  const positiveMaterials = inventory.l1_component.filter((item) =>
+    positiveBOM.some((p) => p.productId === item.productId)
+  );
+
+  const negativeMaterials = inventory.l1_component.filter((item) =>
+    negativeBOM.some((n) => n.productId === item.productId)
+  );
+
   return (
     <div className="max-w-6xl mx-auto p-4">
       <h2 className="text-3xl font-bold text-center mb-6">
@@ -369,13 +511,16 @@ const Inventory = () => {
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-cols-fr gap-4 text-white mb-8">
-        {/* Plates Produced (computed) */}
-        <div className="bg-indigo-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
-          <h4 className="text-lg font-semibold">Plates Produced</h4>
-          <p className="text-2xl">{totalL1Produced}</p>
+        <div className="bg-indigo-500 p-4 rounded shadow text-center h-28 flex flex-col justify-center items-center">
+          <h4 className="text-lg font-semibold mb-2">Plates Produced</h4>
+          <p className="text-2xl font-bold">Total: {totalPlatesProduced}</p>
+          <div className="flex gap-4 mt-1 text-sm">
+            <span>Positive: {totalPositiveProduced}</span>
+            <span>Negative: {totalNegativeProduced}</span>
+          </div>
         </div>
 
-        <div className="bg-teal-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
+        <div className="bg-teal-500 p-4 rounded shadow text-center h-28 flex flex-col justify-center items-center">
           <h4 className="text-lg font-semibold">Low Stock</h4>
           <p className="text-2xl font-bold">{totalLowStock}</p>
           <p className="text-xs mt-1">
@@ -383,12 +528,12 @@ const Inventory = () => {
           </p>
         </div>
 
-        <div className="bg-green-600 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
-          <h4 className="text-lg font-semibold">Ready to Ship</h4>
+        <div className="bg-green-600 p-4 rounded shadow text-center h-28 flex flex-col justify-center items-center">
+          <h4 className="text-lg font-semibold">Batteries</h4>
           <p className="text-2xl">{safeNumber(inventory.finalProducts)}</p>
         </div>
 
-        <div className="bg-red-500 p-3 rounded shadow text-center h-20 flex flex-col justify-center items-center">
+        <div className="bg-red-500 p-4 rounded shadow text-center h-28 flex flex-col justify-center items-center">
           <h4 className="text-lg font-semibold">Discrepancies</h4>
           <p className="text-2xl">
             {safeNumber(
@@ -442,12 +587,21 @@ const Inventory = () => {
         <div>
           <h3 className="text-xl font-semibold mb-4 flex justify-between">
             🔹 L1 | Battery Raw Materials
-            <button
-              className="px-4 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
-              onClick={() => setModalOpen(true)}
-            >
-              Update
-            </button>
+            <div className="flex gap-2">
+              <button
+                className="px-4 py-1 rounded bg-blue-600  text-white hover:bg-blue-700 cursor-pointer"
+                onClick={() => setShowAddModal("true")}
+              >
+                Add
+              </button>
+
+              <button
+                className="px-4 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                onClick={() => setIsL1Open(true)}
+              >
+                Update
+              </button>
+            </div>
           </h3>
 
           <table className="min-w-full border border-gray-300 rounded-md mb-6">
@@ -468,16 +622,17 @@ const Inventory = () => {
 
                 return Object.entries(grouped).map(([category, items]) => (
                   <React.Fragment key={category}>
-                    <tr className="bg-blue-100 text-left">
+                    {/* <tr className="bg-blue-100 text-left">
                       <td colSpan={3} className="px-4 py-2 font-bold">
                         {category}
                       </td>
-                    </tr>
+                    </tr> */}
                     {items.map((item) => (
                       <tr
                         key={item.productId}
                         className={
-                          safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
+                          safeNumber(item.quantity) <=
+                          Number(item.minThreshold ?? LOW_STOCK_THRESHOLD)
                             ? "bg-red-100 text-red-800 font-semibold"
                             : "bg-white"
                         }
@@ -503,12 +658,20 @@ const Inventory = () => {
         <div>
           <h3 className="text-xl font-semibold mb-4 flex justify-between">
             🔸 L2 | Assembly Components
-            <button
-              className="px-4 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
-              onClick={() => setModalOpens(true)}
-            >
-              Update
-            </button>
+            <div className="flex gap-2">
+              <button
+                className="px-4 py-1 rounded bg-blue-600  text-white hover:bg-blue-700 cursor-pointer"
+                onClick={() => setShowAddModalL2("true")}
+              >
+                Add
+              </button>
+              <button
+                className="px-4 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                onClick={() => setIsL2Open(true)}
+              >
+                Update
+              </button>
+            </div>
           </h3>
           <table className="min-w-full border border-gray-300 rounded-md mb-6">
             <thead className="bg-gray-100">
@@ -523,7 +686,8 @@ const Inventory = () => {
                 <tr
                   key={item.productId}
                   className={
-                    safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
+                    safeNumber(item.quantity) <=
+                    Number(item.minThreshold ?? LOW_STOCK_THRESHOLD)
                       ? "bg-red-100 text-red-800 font-semibold"
                       : "bg-white"
                   }
@@ -546,317 +710,79 @@ const Inventory = () => {
           <h3 className="text-xl font-semibold mb-4">⚙️ Settings</h3>
           <div className="grid grid-cols-1 gap-6">
             <div>
-              <h4 className="text-lg font-semibold mb-3">
+              {/* <h4 className="text-lg font-semibold mb-3">
                 L1 | Raw Material Settings
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                {(inventory.l1_component || []).map((item) => (
-                  <div
-                    key={item.productId}
-                    className={`border rounded p-4 shadow ${
-                      safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
-                        ? "bg-red-50"
-                        : "bg-white"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-sm text-gray-500">
-                          {item.productId}
-                        </div>
-                        <div className="text-lg font-semibold">
-                          {item.productName}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {item.category}
-                        </div>
-                        <div className="mt-2">
-                          <span className="font-medium">Qty:</span>{" "}
-                          {safeNumber(item.quantity)} {item.unit}
-                        </div>
-                        <div>
-                          <span className="font-medium">Min Threshold:</span>{" "}
-                          {safeNumber(item.minThreshold)} {item.unit}
-                        </div>
-                      </div>
-                      <div className="flex flex-col space-y-2">
-                        <button
-                          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-                          onClick={async () => {
-                            // Find the current BOM value from inventory
-                            const currentBOM =
-                              (inventory.plateBOM || []).find(
-                                (it) => it.productId === item.productId
-                              )?.qty ?? 0;
+              </h4> */}
 
-                            const input = window.prompt(
-                              `Enter new BOM qty for ${item.productName} (per unit):`,
-                              currentBOM
-                            );
-                            if (input == null) return;
+              <InventorySettingsSection
+                title="L1 | Positive Plate"
+                items={positiveMaterials}
+                // items={inventory.l1_component.filter((item) =>
+                //   item.productName.includes("Positive Plate")
+                // )}
+                bomSource="positivePlateBOM"
+                lowStock={LOW_STOCK_THRESHOLD}
+                updateThreshold={handleThresholdUpdate}
+                updateBOM={handleBOMUpdate}
+              />
 
-                            const val = parseFloat(input);
-
-                            if (isNaN(val)) {
-                              return alert("Invalid number");
-                            }
-
-                            if (val < 0) {
-                              return alert("Negative numbers are not allowed");
-                            }
-
-                            if (val === 0) {
-                              return alert("Zero is not allowed");
-                            }
-
-                            setInventory((prev) => {
-                              const copy = { ...prev };
-                              // find previous BOM entry before mutating
-                              const prevEntry = (copy.plateBOM || []).find(
-                                (it) => it.productId === item.productId
-                              );
-                              const prevQty = prevEntry ? prevEntry.qty : "N/A";
-
-                              copy.plateBOM = (copy.plateBOM || []).map((it) =>
-                                it.productId === item.productId
-                                  ? { ...it, qty: val }
-                                  : it
-                              );
-                              copy.logs = [
-                                ...(copy.logs || []),
-                                {
-                                  timestamp: new Date().toLocaleString(),
-                                  action: `Updated BOM qty for ${item.productName} (${item.productId}) from ${prevQty} to ${val}`,
-                                },
-                              ];
-                              updateInventory(copy)
-                                .then(() => toast.success("BOM updated"))
-                                .catch((e) => {
-                                  console.error(e);
-                                  toast.error("Failed to update BOM");
-                                });
-                              return copy;
-                            });
-                          }}
-                        >
-                          Update BOM
-                        </button>
-
-                        <button
-                          className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
-                          onClick={async () => {
-                            const input = window.prompt(
-                              `Enter new min threshold for ${item.productName}:`,
-                              item.minThreshold ?? ""
-                            );
-                            if (input == null) return;
-                            const val = parseFloat(input);
-                            if (isNaN(val)) return alert("Invalid number");
-                            if (val < 0) {
-                              return alert("Negative numbers are not allowed");
-                            }
-
-                            if (val === 0) {
-                              return alert("Zero is not allowed");
-                            }
-                            setInventory((prev) => {
-                              const copy = { ...prev };
-                              copy.l1_component = (copy.l1_component || []).map(
-                                (it) =>
-                                  it.productId === item.productId
-                                    ? { ...it, minThreshold: val }
-                                    : it
-                              );
-                              copy.logs = [
-                                ...(copy.logs || []),
-                                {
-                                  timestamp: new Date().toLocaleString(),
-                                  action: `Updated Threshold for ${item.productName} from ${item.minThreshold} to ${val}`,
-                                },
-                              ];
-                              updateInventory(copy)
-                                .then(() => toast.success("Threshold updated"))
-                                .catch((e) => {
-                                  console.error(e);
-                                  toast.error("Failed to update threshold");
-                                });
-                              return copy;
-                            });
-                          }}
-                        >
-                          Update Threshold
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <InventorySettingsSection
+                title="L1 | Negative Plate"
+                items={negativeMaterials}
+                // items={inventory.l1_component.filter((item) =>
+                //   item.productName.includes("Negative Plate")
+                // )}
+                bomSource="negativePlateBOM"
+                lowStock={LOW_STOCK_THRESHOLD}
+                updateThreshold={handleThresholdUpdate}
+                updateBOM={handleBOMUpdate}
+              />
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold mb-3">
-                L2 | Assembly Settings
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                {(inventory.l2_component || []).map((item) => (
-                  <div
-                    key={item.productId}
-                    className={`border rounded p-4 shadow ${
-                      safeNumber(item.quantity) <= LOW_STOCK_THRESHOLD
-                        ? "bg-red-50"
-                        : "bg-white"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-sm text-gray-500">
-                          {item.productId}
-                        </div>
-                        <div className="text-lg font-semibold">
-                          {item.productName}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {item.category}
-                        </div>
-                        <div className="mt-2">
-                          <span className="font-medium">Qty:</span>{" "}
-                          {safeNumber(item.quantity)} {item.unit}
-                        </div>
-                        <div>
-                          <span className="font-medium">Min Threshold:</span>{" "}
-                          {safeNumber(item.minThreshold)} {item.unit}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col space-y-2">
-                        {/* --- Update BOM --- */}
-                        <button
-                          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-                          onClick={async () => {
-                            // Get current BOM value from inverterBOM (like L1 uses plateBOM)
-                            const currentBOM =
-                              (inventory.inverterBOM || []).find(
-                                (it) => it.productId === item.productId
-                              )?.qty ?? 0;
-
-                            const input = window.prompt(
-                              `Enter new BOM qty for ${item.productName} (per unit):`,
-                              currentBOM
-                            );
-                            if (input == null) return;
-
-                            const val = parseFloat(input);
-                            if (isNaN(val)) return alert("Invalid number");
-                            if (val < 0)
-                              return alert("Negative numbers are not allowed");
-                            if (val === 0) return alert("Zero is not allowed");
-
-                            setInventory((prev) => {
-                              const copy = { ...prev };
-                              const prevEntry = (copy.inverterBOM || []).find(
-                                (it) => it.productId === item.productId
-                              );
-                              const prevQty = prevEntry ? prevEntry.qty : "N/A";
-
-                              copy.inverterBOM = (copy.inverterBOM || []).map(
-                                (it) =>
-                                  it.productId === item.productId
-                                    ? { ...it, qty: val }
-                                    : it
-                              );
-
-                              copy.logs = [
-                                ...(copy.logs || []),
-                                {
-                                  timestamp: new Date().toLocaleString(),
-                                  action: `Updated Assembly BOM qty for ${item.productName} (${item.productId}) from ${prevQty} to ${val}`,
-                                },
-                              ];
-
-                              updateInventory(copy)
-                                .then(() => toast.success("L2 BOM updated"))
-                                .catch((e) => {
-                                  console.error(e);
-                                  toast.error("Failed to update L2 BOM");
-                                });
-                              return copy;
-                            });
-                          }}
-                        >
-                          Update BOM
-                        </button>
-
-                        {/* --- Update Threshold --- */}
-                        <button
-                          className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
-                          onClick={async () => {
-                            const input = window.prompt(
-                              `Enter new min threshold for ${item.productName}:`,
-                              item.minThreshold ?? ""
-                            );
-                            if (input == null) return;
-
-                            const val = parseFloat(input);
-                            if (isNaN(val)) return alert("Invalid number");
-                            if (val < 0)
-                              return alert("Negative numbers are not allowed");
-                            if (val === 0) return alert("Zero is not allowed");
-
-                            setInventory((prev) => {
-                              const copy = { ...prev };
-                              copy.l2_component = (copy.l2_component || []).map(
-                                (it) =>
-                                  it.productId === item.productId
-                                    ? { ...it, minThreshold: val }
-                                    : it
-                              );
-
-                              copy.logs = [
-                                ...(copy.logs || []),
-                                {
-                                  timestamp: new Date().toLocaleString(),
-                                  action: `Updated L2 Threshold for ${item.productName} (${item.productId}) from ${item.minThreshold} to ${val}`,
-                                },
-                              ];
-
-                              updateInventory(copy)
-                                .then(() =>
-                                  toast.success("L2 Threshold updated")
-                                )
-                                .catch((e) => {
-                                  console.error(e);
-                                  toast.error("Failed to update L2 Threshold");
-                                });
-                              return copy;
-                            });
-                          }}
-                        >
-                          Update Threshold
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <InventorySettingsSection
+                title="L2 | Assembly Settings"
+                items={inventory.l2_component}
+                bomSource="inverterBOM"
+                lowStock={LOW_STOCK_THRESHOLD}
+                updateThreshold={handleThresholdUpdateL2}
+                updateBOM={handleBOMUpdateL2}
+              />
             </div>
           </div>
         </div>
       )}
 
-      {/* Bulk Stock Update Modal */}
-      <BulkStockUpdateModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+      <BulkUpdateModal
+        isOpen={isL1Open}
+        onClose={() => setIsL1Open(false)}
         materials={inventory.l1_component}
+        type="L1"
         setInventory={setInventory}
       />
 
-      <BulkL2UpdateModal
-        isOpen={modalOpens}
-        onClose={() => setModalOpens(false)}
+      <BulkUpdateModal
+        isOpen={isL2Open}
+        onClose={() => setIsL2Open(false)}
         materials={inventory.l2_component}
+        type="L2"
         setInventory={setInventory}
+      />
+
+      <AddProductModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        inventory={inventory}
+        setInventory={setInventory}
+        type="l1" // or "l2"
+      />
+
+      <AddProductModal
+        isOpen={showAddModalL2}
+        onClose={() => setShowAddModalL2(false)}
+        inventory={inventory}
+        setInventory={setInventory}
+        type="l2" // or "l2"
       />
     </div>
   );

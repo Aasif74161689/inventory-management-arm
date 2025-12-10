@@ -3,6 +3,8 @@ import { fetchInventory, updateInventory } from "../firebaseService";
 import Loader from "../components/Loader";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import PlateBOM from "../components/PlateBOM";
+import { normalizeBOM } from "../utils/normalizeBOM";
 
 const Assembly = () => {
   const [inventory, setInventory] = useState(null);
@@ -26,6 +28,7 @@ const Assembly = () => {
 
   // --- Build effective BOM and mapping ---
   const effectiveBOM = inventory?.inverterBOM || [];
+  const assemblyBOM = normalizeBOM(effectiveBOM);
   const l2Map = {};
   if (inventory?.l2_component) {
     inventory.l2_component.forEach((item) => {
@@ -256,33 +259,9 @@ const Assembly = () => {
       <h2 className="text-3xl font-bold text-center mb-6">
         ⚙️ Battery Assembly
       </h2>
-
       {/* --- BOM --- */}
-      <div className="border border-gray-300 rounded-md p-4 bg-gray-50">
-        <h3 className="text-xl font-semibold mb-4 text-center">
-          🧾 BOM for 1 Battery
-        </h3>
-        <div className="flex flex-wrap gap-6">
-          {[
-            effectiveBOM.slice(0, Math.ceil(effectiveBOM.length / 2)),
-            effectiveBOM.slice(Math.ceil(effectiveBOM.length / 2)),
-          ].map((half, i) => (
-            <ul
-              key={i}
-              className="flex-1 list-none  ml-5 space-y-1 text-gray-700"
-            >
-              {half.map((bom) => (
-                <li key={bom.productId}>
-                  <span className="font-medium capitalize">{bom.name}</span>:{" "}
-                  {bom.qty} (Stock: {l2Map[bom.productId]?.quantity || 0}{" "}
-                  {l2Map[bom.productId]?.unit || ""})
-                </li>
-              ))}
-            </ul>
-          ))}
-        </div>
-      </div>
 
+      <PlateBOM title="Battery" bomList={assemblyBOM} stockMap={l2Map} />
       {/* --- Form --- */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex flex-col sm:flex-row gap-3 items-center">
@@ -355,7 +334,6 @@ const Assembly = () => {
           Start Assembly
         </button>
       </form>
-
       {/* --- Orders --- */}
       <section>
         <h3 className="text-xl font-semibold mt-10 mb-4">🛠️ Assembly Orders</h3>

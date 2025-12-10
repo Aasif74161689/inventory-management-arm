@@ -53,41 +53,83 @@ export default function History() {
 
   if (loading) return <Loader />;
 
-  const computeDiscrepancies = (order) => {
-    const discrepancies = [];
-    if (order.status === "completed") {
-      const actualOutput = safeNumber(order.actualOutput);
-      const predictedOutput = safeNumber(order.predictedOutput);
+  // const computeDiscrepancies = (order) => {
+  //   const discrepancies = [];
+  //   if (order.status === "completed") {
+  //     const actualOutput = safeNumber(order.actualOutput);
+  //     const predictedOutput = safeNumber(order.predictedOutput);
 
-      if (actualOutput !== predictedOutput) {
-        discrepancies.push(
-          `Output mismatch: Predicted ${predictedOutput}, Actual ${actualOutput}`
+  //     if (actualOutput !== predictedOutput) {
+  //       discrepancies.push(
+  //         `Output mismatch: Predicted ${predictedOutput}, Actual ${actualOutput}`
+  //       );
+  //     }
+
+  //     const expectedMaterials = {};
+  //     const bomSource = inventory?.plateBOM || [];
+  //     bomSource.forEach((bom) => {
+  //       expectedMaterials[bom.productId] = parseFloat(
+  //         (bom.qty * actualOutput).toFixed(4)
+  //       );
+  //     });
+
+  //     Object.entries(order.materialsUsed || {}).forEach(([prodId, usedQty]) => {
+  //       const expected = expectedMaterials[prodId] ?? 0;
+  //       const used = safeNumber(usedQty);
+  //       if (used !== expected) {
+  //         const bom = (inventory?.plateBOM || []).find(
+  //           (b) => b.productId === prodId
+  //         );
+  //         const name = bom?.name || bom?.productName || prodId;
+  //         discrepancies.push(
+  //           `${name}: used ${used}, expected ${expected} (for ${actualOutput} units)`
+  //         );
+  //       }
+  //     });
+  //   }
+  //   return discrepancies;
+  // };
+
+  const computeDiscrepancies = (order) => {
+    let issues = [];
+
+    const actual = safeNumber(order.actualOutput);
+    const predicted = safeNumber(order.predictedOutput);
+
+    // Output mismatch
+    if (actual !== predicted) {
+      issues.push(`Output mismatch: Expected ${predicted}, Actual ${actual}`);
+    }
+
+    // Materials mismatch
+    const bomList = [
+      ...(inventory?.plateBOM?.positivePlateBOM || []),
+      ...(inventory?.plateBOM?.negativePlateBOM || []),
+    ];
+
+    Object.entries(order.materialsUsed || {}).forEach(([prodId, usedQty]) => {
+      const bom = bomList.find(
+        (b) =>
+          b.productId.toLowerCase() === prodId.toLowerCase() ||
+          b.name?.toLowerCase() === prodId.toLowerCase()
+      );
+
+      const expectedQty = bom ? bom.qty * predicted : null;
+      const displayName = bom?.name || bom?.productName || prodId;
+
+      if (!usedQty || usedQty === 0) {
+        issues.push(`${displayName} is missing or 0`);
+      } else if (
+        expectedQty !== null &&
+        Number(usedQty) !== Number(expectedQty)
+      ) {
+        issues.push(
+          `${displayName}: used ${usedQty}, expected ${expectedQty} (for ${predicted} units)`
         );
       }
+    });
 
-      const expectedMaterials = {};
-      const bomSource = inventory?.plateBOM || [];
-      bomSource.forEach((bom) => {
-        expectedMaterials[bom.productId] = parseFloat(
-          (bom.qty * actualOutput).toFixed(4)
-        );
-      });
-
-      Object.entries(order.materialsUsed || {}).forEach(([prodId, usedQty]) => {
-        const expected = expectedMaterials[prodId] ?? 0;
-        const used = safeNumber(usedQty);
-        if (used !== expected) {
-          const bom = (inventory?.plateBOM || []).find(
-            (b) => b.productId === prodId
-          );
-          const name = bom?.name || bom?.productName || prodId;
-          discrepancies.push(
-            `${name}: used ${used}, expected ${expected} (for ${actualOutput} units)`
-          );
-        }
-      });
-    }
-    return discrepancies;
+    return issues;
   };
 
   return (
@@ -162,11 +204,14 @@ export default function History() {
                 })
                 .map((order) => {
                   const discrepancies = computeDiscrepancies(order);
-                  const cardClass = discrepancies.length
-                    ? "bg-red-50 border-red-300"
-                    : order.status.toLowerCase() === "completed"
-                    ? "bg-green-50 border-green-300"
-                    : "bg-white border-gray-200";
+
+                  const cardClass =
+                    order.status.toLowerCase() === "completed" &&
+                    discrepancies.length === 0
+                      ? "bg-green-50 border-green-300"
+                      : discrepancies.length > 0
+                      ? "bg-red-50 border-red-300"
+                      : "bg-white border-gray-200";
 
                   return (
                     <li
@@ -174,25 +219,21 @@ export default function History() {
                       id={`order-${order.id}`}
                       className={`shadow-sm rounded p-4 border ${cardClass}`}
                     >
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                      <div className="flex justify-between">
                         <div>
                           <p className="font-medium text-gray-800">
                             Order #{order.id} —{" "}
                             <span className="capitalize">{order.status}</span>
                           </p>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <p className="text-sm text-gray-600">
                             {order.timestamp}
                           </p>
                         </div>
-
-                        <div className="mt-3 sm:mt-0 text-sm text-gray-700">
-                          <div>
-                            Predicted:{" "}
-                            <strong>{safeNumber(order.predictedOutput)}</strong>
-                          </div>
-                          <div>
-                            Actual: <strong>{order.actualOutput ?? "-"}</strong>
-                          </div>
+                        <div className="text-sm text-gray-700">
+                          Predicted:{" "}
+                          <strong>{safeNumber(order.predictedOutput)}</strong>
+                          <br />
+                          Actual: <strong>{order.actualOutput ?? "-"}</strong>
                         </div>
                       </div>
 
@@ -201,7 +242,13 @@ export default function History() {
                         <ul className="list-disc ml-5">
                           {Object.entries(order.materialsUsed || {}).map(
                             ([prodId, qty]) => {
-                              const bom = inventory?.plateBOM.find(
+                              const bomList = [
+                                ...(inventory?.plateBOM?.positivePlateBOM ||
+                                  []),
+                                ...(inventory?.plateBOM?.negativePlateBOM ||
+                                  []),
+                              ];
+                              const bom = bomList.find(
                                 (b) => b.productId === prodId
                               );
                               const name =
@@ -216,8 +263,9 @@ export default function History() {
                         </ul>
                       </div>
 
+                      {/* Discrepancy Card */}
                       {discrepancies.length > 0 && (
-                        <div className="mt-3 border border-red-300 bg-red-50 text-red-800 p-3 rounded">
+                        <div className="mt-3 border border-red-300 bg-red-50 text-red-800 p-3 rounded shadow-sm">
                           <strong className="block mb-1">
                             ⚠️ Discrepancy Report
                           </strong>
